@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "MeowTalk",
+    "slug": "MeowTalk",
+    "version": "1.0.0",
+    "platforms": ["ios", "android", "web"],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
