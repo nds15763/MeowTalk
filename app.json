@@ -3,9 +3,29 @@
     "name": "MeowTalk",
     "slug": "MeowTalk",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e7e96cfc-9300-4b1d-9ab5-c892c220d738"
+      }
+    },
+    "android": {
+      "package": "com.xyakim.MeowTalk"
+    },
+    "ios": {
+      "bundleIdentifier": "com.xyakim.MeowTalk"
     }
   }
 }
