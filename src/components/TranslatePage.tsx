@@ -6,7 +6,7 @@ import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
 
 const windowWidth = Dimensions.get('window').width;
-const buttonWidth = (windowWidth - 60) / 3; // 60 是左右边距和按钮之间的间隔
+const buttonWidth = (windowWidth - 40) / 3; // 40 是左右边距和按钮之间的间隔
 
 export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
@@ -64,7 +64,7 @@ export default function TranslatePage() {
                 styles.emotionButton,
                 selectedEmotion?.id === emotion.id && styles.selectedEmotion,
                 { width: buttonWidth, height: buttonWidth },
-                index % 3 === 2 ? styles.lastInRow : null,
+                (index + 1) % 3 === 0 ? styles.lastInRow : null,
               ]}
               onPress={() => handleEmotionSelect(emotion)}
             >
@@ -124,14 +124,12 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   emotionButton: {
-    borderRadius: buttonWidth / 2,
+    borderRadius: 10,
     backgroundColor: '#FF69B4',
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 5,
-  },
-  lastInRow: {
-    marginRight: 0,
+    marginBottom: 10,
+    marginRight: 10,
   },
   selectedEmotion: {
     backgroundColor: '#FF1493',
@@ -153,5 +151,8 @@ const styles = StyleSheet.create({
   descriptionText: {
     fontSize: 16,
     textAlign: 'center',
+  },
+  lastInRow: {
+    marginRight: 0,
   },
 });
