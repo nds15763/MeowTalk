@@ -24,7 +24,7 @@ export const emotions: Emotion[] = [
     icon: '😺',
     title: '友好呼唤',
     description: '友好得呼唤对方猫咪',
-    audioFile: '../../assets/audios/call.MP3',
+    audioFile: '../../audios/call.MP3',
     categoryId: 'friendly',
   },
   {
@@ -32,7 +32,7 @@ export const emotions: Emotion[] = [
     icon: '😌',
     title: '舒适',
     description: '您的猫咪感到舒适和放松。',
-    audioFile: '../../assets/audios/comfortable.MP3',
+    audioFile: '../../audios/comfortable.MP3',
     categoryId: 'friendly',
   },
   {
@@ -40,7 +40,7 @@ export const emotions: Emotion[] = [
     icon: '🥰',
     title: '撒娇',
     description: '撒娇的呼唤对方猫咪',
-    audioFile: '../../assets/audios/flighty.MP3',
+    audioFile: '../../audios/flighty.MP3',
     categoryId: 'friendly',
   },
   {
@@ -48,7 +48,7 @@ export const emotions: Emotion[] = [
     icon: '😊',
     title: '满足',
     description: '你感到满足',
-    audioFile: '../../assets/audios/satisfy.MP3',
+    audioFile: '../../audios/satisfy.MP3',
     categoryId: 'friendly',
   },
   {
@@ -56,7 +56,7 @@ export const emotions: Emotion[] = [
     icon: '😋',
     title: '美味',
     description: '你感到美味',
-    audioFile: '../../assets/audios/yummy.MP3',
+    audioFile: '../../audios/yummy.MP3',
     categoryId: 'friendly',
   },
   {
@@ -64,7 +64,7 @@ export const emotions: Emotion[] = [
     icon: '👋',
     title: '打招呼',
     description: '友好打招呼、撒娇',
-    audioFile: '../../assets/audios/hello.MP3',
+    audioFile: '../../audios/hello.MP3',
     categoryId: 'attention',
   },
   {
@@ -72,7 +72,7 @@ export const emotions: Emotion[] = [
     icon: '🍽️',
     title: '需求食物',
     description: '问候，对食物有需求',
-    audioFile: '../../assets/audios/for_food.MP3',
+    audioFile: '../../audios/for_food.MP3',
     categoryId: 'attention',
   },
   {
@@ -80,7 +80,7 @@ export const emotions: Emotion[] = [
     icon: '🎭',
     title: '邀请玩耍',
     description: '邀请玩耍',
-    audioFile: '../../assets/audios/ask_for_play.MP3',
+    audioFile: '../../audios/ask_for_play.MP3',
     categoryId: 'attention',
   },
   {
@@ -88,7 +88,7 @@ export const emotions: Emotion[] = [
     icon: '🐁',
     title: '邀请狩猎',
     description: '兴奋、捕猎',
-    audioFile: '../../assets/audios/ask_for_hunting.MP3',
+    audioFile: '../../audios/ask_for_hunting.MP3',
     categoryId: 'attention',
   },
   {
@@ -96,7 +96,7 @@ export const emotions: Emotion[] = [
     icon: '😣',
     title: '委屈',
     description: '委屈、不舒服、别弄我',
-    audioFile: '../../assets/audios/discomfort.MP3',
+    audioFile: '../../audios/discomfort.MP3',
     categoryId: 'attention',
   },
   {
@@ -104,7 +104,7 @@ export const emotions: Emotion[] = [
     icon: '🐈',
     title: '求助/找妈妈',
     description: '求助/找妈妈',
-    audioFile: '../../assets/audios/find_mom.MP3',
+    audioFile: '../../audios/find_mom.MP3',
     categoryId: 'attention',
   },
   {
@@ -112,7 +112,7 @@ export const emotions: Emotion[] = [
     icon: '😰',
     title: '焦虑/害怕',
     description: '焦虑/害怕',
-    audioFile: '../../assets/audios/anxious.MP3',
+    audioFile: '../../audios/anxious.MP3',
     categoryId: 'attention',
   },
   {
@@ -120,7 +120,7 @@ export const emotions: Emotion[] = [
     icon: '💕',
     title: '求偶',
     description: '求偶',
-    audioFile: '../../assets/audios/courtship.MP3',
+    audioFile: '../../audios/courtship.MP3',
     categoryId: 'attention',
   },
   {
@@ -128,7 +128,7 @@ export const emotions: Emotion[] = [
     icon: '🤔',
     title: '敷衍、好奇',
     description: '敷衍、好奇',
-    audioFile: '../../assets/audios/curious.MP3',
+    audioFile: '../../audios/curious.MP3',
     categoryId: 'attention',
   },
   {
@@ -136,7 +136,7 @@ export const emotions: Emotion[] = [
     icon: '🚫',
     title: '走开！',
     description: '走开！',
-    audioFile: '../../assets/audios/goaway.MP3',
+    audioFile: '../../audios/goaway.MP3',
     categoryId: 'warning',
   },
   {
@@ -144,7 +144,7 @@ export const emotions: Emotion[] = [
     icon: '👉',
     title: '滚开！',
     description: '滚开！',
-    audioFile: '../../assets/audios/goout.MP3',
+    audioFile: '../../audios/goout.MP3',
     categoryId: 'warning',
   },
   {
@@ -152,7 +152,7 @@ export const emotions: Emotion[] = [
     icon: '💀',
     title: '死开！',
     description: '死开！',
-    audioFile: '../../assets/audios/dieaway.MP3',
+    audioFile: '../../audios/dieaway.MP3',
     categoryId: 'warning',
   },
   {
@@ -160,7 +160,7 @@ export const emotions: Emotion[] = [
     icon: '⚠️',
     title: '警告、驱逐',
     description: '警告、驱逐',
-    audioFile: '../../assets/audios/warning.MP3',
+      audioFile: '../../audios/warning.MP3',
     categoryId: 'warning',
   },
   {
@@ -168,7 +168,7 @@ export const emotions: Emotion[] = [
     icon: '😒',
     title: '别弄我、不满',
     description: '别弄我、不满',
-    audioFile: '../../assets/audios/unhappy.MP3',
+    audioFile: '../../audios/unhappy.MP3',
     categoryId: 'warning',
   },
   {
@@ -176,7 +176,7 @@ export const emotions: Emotion[] = [
     icon: '🚨',
     title: '敌视、警惕',
     description: '敌视、警惕',
-    audioFile: '../../assets/audios/alert.MP3',
+    audioFile: '../../audios/alert.MP3',
     categoryId: 'warning',
   },
   {
@@ -184,7 +184,7 @@ export const emotions: Emotion[] = [
     icon: '🥊',
     title: '强烈警告',
     description: '强烈警告、准备战斗',
-    audioFile: '../../assets/audios/for_fight.MP3',
+    audioFile: '../../audios/for_fight.MP3',
     categoryId: 'warning',
   },
   {
@@ -192,7 +192,7 @@ export const emotions: Emotion[] = [
     icon: '😱',
     title: '害怕',
     description: '您的猫咪感到害怕或威胁。',
-    audioFile: '../../assets/audios/scared_meow.MP3',
+    audioFile: '../../audios/scared_meow.MP3',
     categoryId: 'warning',
   },
 ];

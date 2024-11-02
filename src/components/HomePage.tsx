@@ -9,7 +9,7 @@ export default function HomePage() {
   return (
     <SafeAreaView style={styles.container}>
       <Image
-        source={require('../../assets/images/cat_logo.png')}
+        source={require('../../images/cat_logo.png')}
         style={styles.logo}
       />
       <Text style={styles.title}>Welcome to MeowTalk</Text>
