@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView } from 'react-native';
 
 interface Message {
@@ -9,6 +9,7 @@ interface Message {
 }
 
 export default function ChatMessages() {
+  const scrollViewRef = useRef<ScrollView>(null);
   const [messages] = useState<Message[]>([
     {
       id: '1',
@@ -72,12 +73,23 @@ export default function ChatMessages() {
     }
   ]);
 
+  // 组件挂载和消息更新时滚动到底部
+  useEffect(() => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  }, [messages]);
+
   return (
     <View style={styles.container}>
       <ScrollView 
+        ref={scrollViewRef}
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={true}
+        onContentSizeChange={() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }}
       >
         {messages.map((message) => (
           <View

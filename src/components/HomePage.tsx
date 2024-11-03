@@ -20,12 +20,6 @@ export default function HomePage() {
       >
         <Text style={styles.buttonText}>Go to Chat</Text>
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Translate' as never)}
-      >
-        <Text style={styles.buttonText}>Translate</Text>
-      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -58,6 +52,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 15,
     borderRadius: 25,
+    marginTop: 10,
   },
   buttonText: {
     color: '#fff',
