@@ -4,6 +4,7 @@ import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
 import ChatMessages from './ChatMessages';
+import EmojiPopup from './EmojiPopup';
 
 const windowWidth = Dimensions.get('window').width;
 const buttonWidth = (windowWidth - 80) / 4;
@@ -11,7 +12,8 @@ const buttonWidth = (windowWidth - 80) / 4;
 export default function EmojiPanel() {
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory>(emotionCategories[1]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-
+  const [currentEmotion, setCurrentEmotion] = useState<Emotion | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const handleCategorySelect = (category: EmotionCategory) => {
     setSelectedCategory(category);
@@ -27,11 +29,56 @@ export default function EmojiPanel() {
   }
 
   const handleEmotionSelect = async (emotion: Emotion) => {
-    // 播放声音
-    if (emotion.audioFile) {
-      await playSound(emotion.audioFile);
+    // 如果有正在播放的音频，立即停止
+    if (sound) {
+      await sound.stopAsync();
+      await sound.unloadAsync();
     }
-    
+
+    // 设置当前选中的表情
+    setCurrentEmotion(emotion);
+    setIsPlaying(true);
+
+    // 播放新的音频
+    if (emotion.audioFile) {
+      const { sound: newSound, status } = await Audio.Sound.createAsync(
+        emotion.audioFile,
+        { shouldPlay: true }
+      );
+      setSound(newSound);
+      
+      // 获取音频时长
+      const audioStatus = await newSound.getStatusAsync();
+      const audioDuration = audioStatus.isLoaded && audioStatus.durationMillis 
+        ? audioStatus.durationMillis 
+        : 3000;
+      
+      // 创建新的 emotion 对象，包含音频时长
+      const emotionWithDuration: Emotion = {
+        ...emotion,
+        audioDuration,
+      };
+      
+      setCurrentEmotion(emotionWithDuration);
+      setIsPlaying(true);
+
+      // 监听音频播放完成
+      newSound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded) return;
+        
+        // 检查播放是否结束
+        if (status.positionMillis && status.durationMillis && 
+            status.positionMillis >= status.durationMillis) {
+          setIsPlaying(false);
+          setCurrentEmotion(null);
+        }
+      });
+    }
+  };
+
+  const handlePopupComplete = () => {
+    setCurrentEmotion(null);
+    setIsPlaying(false);
   };
 
   return (
@@ -67,6 +114,14 @@ export default function EmojiPanel() {
             ))}
         </View>
       </View>
+
+      {currentEmotion && isPlaying && (
+        <EmojiPopup
+          emotion={currentEmotion}
+          duration={currentEmotion.audioDuration || 3000} // 使用保存的时长，如果没有则使用默认值
+          onComplete={handlePopupComplete}
+        />
+      )}
     </View>
   );
 }
