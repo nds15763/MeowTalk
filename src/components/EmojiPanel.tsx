@@ -11,7 +11,7 @@ const buttonWidth = (windowWidth - 80) / 4;
 export default function EmojiPanel() {
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory>(emotionCategories[1]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const chatMessagesRef = useRef<ChatMessages | null>(null);
+
 
   const handleCategorySelect = (category: EmotionCategory) => {
     setSelectedCategory(category);
@@ -32,10 +32,6 @@ export default function EmojiPanel() {
       await playSound(emotion.audioFile);
     }
     
-    // 触发表情动画
-    if (chatMessagesRef.current) {
-      chatMessagesRef.current.showEmojiAnimation(emotion.icon);
-    }
   };
 
   return (
@@ -101,21 +97,19 @@ const styles = StyleSheet.create({
   },
   emojiContainer: {
     flex: 1,
-    paddingTop: 20,
     paddingHorizontal: 20,
-    paddingBottom: 20,
   },
   emojiContent: {
-    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    gap: 10,
   },
   emojiButton: {
     width: buttonWidth,
     alignItems: 'center',
-    marginBottom: 20,
-    marginHorizontal: 5,
+    marginVertical: 5,
   },
   emojiIcon: {
     fontSize: 24,

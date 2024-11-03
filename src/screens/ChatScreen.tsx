@@ -22,24 +22,26 @@ export function ChatScreen() {
 
       <ListeningPanel />
 
-      <View style={styles.contentContainer}>
-        <ChatMessages />
-      </View>
+      <View style={styles.mainContainer}>
+        <View style={styles.chatContainer}>
+          <ChatMessages />
+        </View>
 
-      <View style={styles.emojiPanelWrapper}>
-        <EmojiPanel />
-        <View style={styles.pawButtonWrapper}>
-          <View style={styles.semiCircleBackground}>
-            <TouchableOpacity
-              style={styles.pawButton}
-              onPressIn={() => setIsRecording(true)}
-              onPressOut={() => setIsRecording(false)}
-            >
-              <Image
-                source={require('../../assets/icons/paw.png')}
-                style={styles.pawIcon}
-              />
-            </TouchableOpacity>
+        <View style={styles.emojiPanelWrapper}>
+          <EmojiPanel />
+          <View style={styles.pawButtonWrapper}>
+            <View style={styles.semiCircleBackground}>
+              <TouchableOpacity
+                style={styles.pawButton}
+                onPressIn={() => setIsRecording(true)}
+                onPressOut={() => setIsRecording(false)}
+              >
+                <Image
+                  source={require('../../assets/icons/paw.png')}
+                  style={styles.pawIcon}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -56,10 +58,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  contentContainer: {
+  mainContainer: {
     flex: 1,
-    marginTop: 60,
-    marginBottom: '40%',
+    paddingTop: 60,
+  },
+  chatContainer: {
+    height: '60%',
+    paddingBottom: 10,
+  },
+  chatArea: {
+    flex: 1,
   },
   emojiPanelWrapper: {
     position: 'absolute',
