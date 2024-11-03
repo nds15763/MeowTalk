@@ -16,6 +16,12 @@ export default function HomePage() {
       <Text style={styles.subtitle}>Translate your cat's meows into emotions!</Text>
       <TouchableOpacity
         style={styles.button}
+        onPress={() => navigation.navigate('Chat' as never)}
+      >
+        <Text style={styles.buttonText}>Go to Chat</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.button}
         onPress={() => navigation.navigate('Translate' as never)}
       >
         <Text style={styles.buttonText}>Translate</Text>
