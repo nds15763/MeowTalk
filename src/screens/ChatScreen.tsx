@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import EmojiPanel from '../components/EmojiPanel';
 import ListeningPanel from '../components/ListeningPanel';
 import ChatMessages from '../components/ChatMessages';
+import { layout } from '../styles/layout';
+import { Emotion } from '../types/emotion';
 
 export function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false);
 
+  const handleEmotionDetected = (emotion: Emotion) => {
+    // 处理检测到的情感
+    console.log('Emotion detected:', emotion);
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[layout.container, styles.container]}>
       <Image 
         source={require('../../assets/icons/back.png')} 
         style={[styles.backgroundImage, { opacity: 0.3 }]}
         resizeMode="cover"
       />
 
-      <ListeningPanel />
+      <ListeningPanel onEmotionDetected={handleEmotionDetected} />
 
       <View style={styles.mainContainer}>
         <View style={styles.chatContainer}>
@@ -29,20 +31,6 @@ export function ChatScreen() {
 
         <View style={styles.emojiPanelWrapper}>
           <EmojiPanel />
-          <View style={styles.pawButtonWrapper}>
-            <View style={styles.semiCircleBackground}>
-              <TouchableOpacity
-                style={styles.pawButton}
-                onPressIn={() => setIsRecording(true)}
-                onPressOut={() => setIsRecording(false)}
-              >
-                <Image
-                  source={require('../../assets/icons/paw.png')}
-                  style={styles.pawIcon}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
       </View>
     </View>

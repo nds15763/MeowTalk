@@ -1,62 +1,70 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
+import { Text, View, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import tw from 'twrnc';
 
 export default function HomePage() {
   const navigation = useNavigation();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Image
-        source={require('../../images/cat_logo.png')}
-        style={styles.logo}
-      />
-      <Text style={styles.title}>Welcome to MeowTalk</Text>
-      <Text style={styles.subtitle}>Translate your cat's meows into emotions!</Text>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Chat' as never)}
-      >
-        <Text style={styles.buttonText}>Go to Chat</Text>
-      </TouchableOpacity>
+    <SafeAreaView style={tw`flex-1 bg-background`}>
+      <View style={tw`absolute inset-0 opacity-30 z-0`}>
+        <Image 
+          source={require('../../images/home-back.png')} 
+          style={tw`w-full h-full`}
+          resizeMode="repeat"
+        />
+      </View>
+      
+      <View style={tw`flex-1 items-center justify-center p-5 z-10`}>
+        <View style={tw`w-[300px] h-[300px] rounded-full overflow-hidden mb-8`}>
+          <Image
+            source={require('../../images/cat_logo.png')}
+            style={tw`w-full h-full`}
+            resizeMode="cover"
+          />
+        </View>
+        
+        <Text style={tw`text-[40px] font-montserrat font-bold text-[#000958] text-center mb-5`}>
+          Meow Talker
+        </Text>
+        
+        <Text style={tw`text-[20px] font-dm-sans text-[#000958] text-center mb-10`}>
+          Want to Know {'\n'}
+          What Your Cat is Saying?
+        </Text>
+        
+        <TouchableOpacity
+          style={[
+            tw`
+              w-[159px] 
+              h-[64px] 
+              rounded-[100px] 
+              justify-center 
+              items-center 
+              px-2
+              shadow-button
+              active:scale-95 
+              transition-all
+              z-20
+            `,
+            { backgroundColor: '#ff5b2e' }
+          ]}
+          onPress={() => navigation.navigate('Chat' as never)}
+        >
+          <Text style={tw`
+            text-white 
+            font-red-hat 
+            text-[24px] 
+            font-bold 
+            leading-[32px]
+          `}>
+            Talk Now
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  logo: {
-    width: 150,
-    height: 150,
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  button: {
-    backgroundColor: '#FF69B4',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 25,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-});

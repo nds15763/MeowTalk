@@ -18,15 +18,19 @@
     "expo": "~51.0.28",
     "expo-av": "^14.0.7",
     "expo-dev-client": "^4.0.28",
+    "expo-font": "^12.0.10",
     "expo-status-bar": "~1.12.1",
+    "nativewind": "^4.1.23",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.5",
+    "react-native-audio": "^4.3.0",
     "react-native-gesture-handler": "^2.20.2",
     "react-native-safe-area-context": "^4.14.0",
     "react-native-screens": "^3.35.0",
     "react-native-sound": "^0.11.2",
-    "react-native-web": "~0.19.10"
+    "react-native-web": "~0.19.10",
+    "twrnc": "^4.6.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

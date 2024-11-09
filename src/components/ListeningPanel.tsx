@@ -1,17 +1,90 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, Image, Text, Animated } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, View, TouchableOpacity, Image, Text, Animated, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
+import { Emotion } from '../types/emotion';
+import { typography } from '../styles/typography';
+import { layout } from '../styles/layout';
 
-export default function ListeningPanel() {
+interface Props {
+  onEmotionDetected: (emotion: Emotion) => void;
+}
+
+export default function ListeningPanel({ onEmotionDetected }: Props) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [hasPermission, setHasPermission] = useState(false);
   const heightAnim = useRef(new Animated.Value(0)).current;
+  const recording = useRef<Audio.Recording | null>(null);
 
+  // 请求录音权限
+  const requestPermission = async () => {
+    const { granted } = await Audio.requestPermissionsAsync();
+    setHasPermission(granted);
+    return granted;
+  };
+
+  // 开始录音
+  const startRecording = async () => {
+    try {
+      if (!hasPermission) {
+        const granted = await requestPermission();
+        if (!granted) return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      
+      recording.current = newRecording;
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+    }
+  };
+
+  // 停止录音
+  const stopRecording = async () => {
+    if (!recording.current) return;
+
+    try {
+      await recording.current.stopAndUnloadAsync();
+      const uri = recording.current.getURI();
+      recording.current = null;
+      setIsRecording(false);
+
+      if (uri) {
+        // 这里可以处理录音文件，比如上传或分析
+        console.log('Recording saved to:', uri);
+        
+        // TODO: 这里需要实现音频分析逻辑
+        // 模拟检测到情感
+        const mockEmotion = {
+          id: 'comfortable',
+          icon: '😌',
+          title: '舒适',
+          description: '您的猫咪感到舒适和放松。',
+          audioFile: uri,
+          categoryId: 'friendly',
+        };
+        onEmotionDetected(mockEmotion);
+      }
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+    }
+  };
+
+  // 切换面板展开/收起状态
   const togglePanel = () => {
-    console.log('Toggling panel, current state:', isExpanded);
     Animated.spring(heightAnim, {
       toValue: isExpanded ? 0 : 1,
       useNativeDriver: false,
@@ -33,6 +106,7 @@ export default function ListeningPanel() {
 
   return (
     <Animated.View style={[
+      layout.container,
       styles.container, 
       { 
         height: containerHeight,
@@ -49,7 +123,12 @@ export default function ListeningPanel() {
         </TouchableOpacity>
 
         <TouchableOpacity 
-          style={styles.pawButton}
+          style={[
+            styles.pawButton,
+            isRecording && styles.pawButtonActive
+          ]}
+          onPressIn={startRecording}
+          onPressOut={stopRecording}
           onPress={togglePanel}
           activeOpacity={0.7}
         >
@@ -65,13 +144,23 @@ export default function ListeningPanel() {
         styles.expandedContent, 
         { opacity: contentOpacity }
       ]}>
-        <View style={styles.microphoneCircle}>
+        <View style={[
+          styles.microphoneCircle,
+          isRecording && styles.microphoneCircleActive
+        ]}>
           <Image
             source={require('../../assets/icons/paw.png')}
             style={styles.microphoneIcon}
           />
         </View>
-        <Text style={styles.listeningText}>Listening...</Text>
+        <Text style={[typography.text, styles.listeningText]}>
+          {isRecording ? '正在录音...' : '按住爪子开始录音'}
+        </Text>
+        {!hasPermission && (
+          <Text style={[typography.text, styles.permissionText]}>
+            需要录音权限来识别猫咪的声音
+          </Text>
+        )}
       </Animated.View>
     </Animated.View>
   );
@@ -118,6 +207,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  pawButtonActive: {
+    backgroundColor: '#E64A19',
+  },
   pawIcon: {
     width: 24,
     height: 24,
@@ -138,6 +230,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  microphoneCircleActive: {
+    backgroundColor: '#E64A19',
+    transform: [{ scale: 1.1 }],
+  },
   microphoneIcon: {
     width: 40,
     height: 40,
@@ -147,5 +243,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#333',
     fontWeight: '500',
+  },
+  permissionText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
   },
 }); 
