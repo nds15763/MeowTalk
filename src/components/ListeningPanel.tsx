@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, View, TouchableOpacity, Image, Text, Animated, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { Audio } from 'expo-av';
 import { Emotion } from '../types/emotion';
 import { typography } from '../styles/typography';
 import { layout } from '../styles/layout';
+// import { useAudioAnalysis } from '../contexts/AudioAnalysisContext';
 
 interface Props {
   onEmotionDetected: (emotion: Emotion) => void;
@@ -20,6 +21,7 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
   const [hasPermission, setHasPermission] = useState(false);
   const heightAnim = useRef(new Animated.Value(0)).current;
   const recording = useRef<Audio.Recording | null>(null);
+  // const { startListening, stopListening, isListening, currentEmotion } = useAudioAnalysis();
 
   // 请求录音权限
   const requestPermission = async () => {
@@ -27,6 +29,13 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
     setHasPermission(granted);
     return granted;
   };
+
+  // 监听当前情感变化
+  // useEffect(() => {
+  //   if (currentEmotion) {
+  //     onEmotionDetected(currentEmotion);
+  //   }
+  // }, [currentEmotion, onEmotionDetected]);
 
   // 开始录音
   const startRecording = async () => {
@@ -36,16 +45,7 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
         if (!granted) return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      
-      recording.current = newRecording;
+    //  await startListening();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -54,30 +54,9 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
 
   // 停止录音
   const stopRecording = async () => {
-    if (!recording.current) return;
-
     try {
-      await recording.current.stopAndUnloadAsync();
-      const uri = recording.current.getURI();
-      recording.current = null;
+     // await stopListening();
       setIsRecording(false);
-
-      if (uri) {
-        // 这里可以处理录音文件，比如上传或分析
-        console.log('Recording saved to:', uri);
-        
-        // TODO: 这里需要实现音频分析逻辑
-        // 模拟检测到情感
-        const mockEmotion = {
-          id: 'comfortable',
-          icon: '😌',
-          title: '舒适',
-          description: '您的猫咪感到舒适和放松。',
-          audioFile: uri,
-          categoryId: 'friendly',
-        };
-        onEmotionDetected(mockEmotion);
-      }
     } catch (error) {
       console.error('Failed to stop recording:', error);
     }
