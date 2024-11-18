@@ -67,6 +67,8 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
         console.log('Recording saved to:', uri);
         
         // TODO: 这里需要实现音频分析逻辑
+        
+
         // 模拟检测到情感
         const mockEmotion = {
           id: 'comfortable',

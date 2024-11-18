@@ -8,7 +8,7 @@ export default function HomePage() {
   const navigation = useNavigation();
 
   return (
-    <SafeAreaView style={tw`flex-1 bg-background`}>
+    <SafeAreaView style={tw`flex-1 bg-[#19191a]`}>
       <View style={tw`absolute inset-0 opacity-30 z-0`}>
         <Image 
           source={require('../../images/home-back.png')} 
@@ -26,11 +26,11 @@ export default function HomePage() {
           />
         </View>
         
-        <Text style={tw`text-[40px] font-montserrat font-bold text-[#000958] text-center mb-5`}>
+        <Text style={tw`text-[40px] font-montserrat font-bold text-white text-center mb-5`}>
           Meow Talker
         </Text>
         
-        <Text style={tw`text-[20px] font-dm-sans text-[#000958] text-center mb-10`}>
+        <Text style={tw`text-[20px] font-dm-sans text-white text-center mb-10`}>
           Want to Know {'\n'}
           What Your Cat is Saying?
         </Text>
@@ -49,7 +49,7 @@ export default function HomePage() {
               transition-all
               z-20
             `,
-            { backgroundColor: '#ff5b2e' }
+            { backgroundColor: '#19191a' }
           ]}
           onPress={() => navigation.navigate('Chat' as never)}
         >
