@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   selectedTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#FF5722',
+    borderBottomColor: '#19191a',
   },
   tabTitle: {
     fontSize: 14,

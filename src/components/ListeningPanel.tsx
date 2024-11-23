@@ -63,7 +63,7 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
       setIsRecording(false);
 
       if (uri) {
-        // 这里可以处理录音文件，比如上传或分析
+        // 这里可以理录音文件，比如上传或分析
         console.log('Recording saved to:', uri);
         
         // TODO: 这里需要实现音频分析逻辑
@@ -115,55 +115,35 @@ export default function ListeningPanel({ onEmotionDetected }: Props) {
         paddingTop: insets.top 
       }
     ]}>
-      {/* 工具栏 - 始终显示 */}
+      {/* 工具栏 */}
       <View style={styles.toolbar}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={28} color="#333" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[
-            styles.pawButton,
-            isRecording && styles.pawButtonActive
-          ]}
-          onPressIn={startRecording}
-          onPressOut={stopRecording}
-          onPress={togglePanel}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={require('../../assets/icons/paw.png')}
-            style={styles.pawIcon}
-          />
+          <Ionicons name="chevron-back" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* 展开的内容 */}
-      <Animated.View style={[
-        styles.expandedContent, 
-        { opacity: contentOpacity }
-      ]}>
-        <View style={[
-          styles.microphoneCircle,
-          isRecording && styles.microphoneCircleActive
-        ]}>
-          <Image
-            source={require('../../assets/icons/paw.png')}
-            style={styles.microphoneIcon}
-          />
-        </View>
-        <Text style={[typography.text, styles.listeningText]}>
-          {isRecording ? '正在录音...' : '按住爪子开始录音'}
-        </Text>
-        {!hasPermission && (
-          <Text style={[typography.text, styles.permissionText]}>
-            需要录音权限来识别猫咪的声音
-          </Text>
+      {/* 录音猫咪按钮 */}
+      <TouchableOpacity 
+        style={styles.recordingCatContainer}
+        onPressIn={startRecording}
+        onPressOut={stopRecording}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={require('../../images/recording_cat.png')}
+          style={[
+            styles.recordingCat,
+            isRecording && styles.recordingCatActive
+          ]}
+          resizeMode="contain"
+        />
+        {isRecording && (
+          <Text style={styles.recordingText}>正在录音...</Text>
         )}
-      </Animated.View>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -174,24 +154,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: '#19191a',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
     overflow: 'hidden',
     zIndex: 1000,
   },
   toolbar: {
     height: 60,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
   },
@@ -201,55 +172,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pawButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#FF5722',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pawButtonActive: {
-    backgroundColor: '#E64A19',
-  },
-  pawIcon: {
-    width: 24,
-    height: 24,
-    tintColor: '#fff',
-  },
-  expandedContent: {
-    flex: 1,
-    justifyContent: 'center',
+  recordingCatContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     alignItems: 'center',
     paddingBottom: 20,
   },
-  microphoneCircle: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#FF5722',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+  recordingCat: {
+    width: '100%',
+    height: 120,
+    transform: [{ translateY: 60 }], // 让猫咪只露出上半部分
   },
-  microphoneCircleActive: {
-    backgroundColor: '#E64A19',
-    transform: [{ scale: 1.1 }],
+  recordingCatActive: {
+    transform: [
+      { translateY: 60 },
+      { scale: 1.05 }
+    ],
   },
-  microphoneIcon: {
-    width: 40,
-    height: 40,
-    tintColor: '#fff',
-  },
-  listeningText: {
-    fontSize: 18,
-    color: '#333',
+  recordingText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: -40, // 调整文字位置，使其显示在猫咪上方
     fontWeight: '500',
-  },
-  permissionText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
   },
 }); 

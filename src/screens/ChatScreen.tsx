@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
   semiCircleBackground: {
     width: 100,
     height: 100,
-    backgroundColor: '#FF5722',
+    // backgroundColor: '#FF5722',
     borderTopRightRadius: 100,
     justifyContent: 'center',
     alignItems: 'center',
