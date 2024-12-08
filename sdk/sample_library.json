@@ -1,0 +1,147 @@
+{
+  "totalSamples": 7,
+  "emotions": [
+    "contented",
+    "feels very tasty",
+    "affectionate"
+  ],
+  "samples": {
+    "affectionate": [
+      {
+        "FilePath": "emotion_samples\\affectionate\\affectionate_1.WAV",
+        "Emotion": "affectionate",
+        "Features": {
+          "ZeroCrossRate": 0.025278619078725972,
+          "Energy": 0.002022098677278694,
+          "Pitch": 11025,
+          "Duration": 3.436553287981859,
+          "PeakFreq": 1358.6105346679688,
+          "RootMeanSquare": 0.04496775152571778,
+          "SpectralCentroid": 2749.927757398715,
+          "SpectralRolloff": 1719.4599151611328,
+          "FundamentalFreq": 11025
+        }
+      },
+      {
+        "FilePath": "emotion_samples\\affectionate\\affectionate_2.WAV",
+        "Emotion": "affectionate",
+        "Features": {
+          "ZeroCrossRate": 0.021474714232003086,
+          "Energy": 0.0006133957867760452,
+          "Pitch": 14700,
+          "Duration": 4.6439909297052155,
+          "PeakFreq": 1327.4883270263672,
+          "RootMeanSquare": 0.02476682835520215,
+          "SpectralCentroid": 2756.087994575256,
+          "SpectralRolloff": 1848.995590209961,
+          "FundamentalFreq": 14700
+        }
+      }
+    ],
+    "contented": [
+      {
+        "FilePath": "emotion_samples\\contented\\contented_1.WAV",
+        "Emotion": "contented",
+        "Features": {
+          "ZeroCrossRate": 0.0162016715927921,
+          "Energy": 0.0002711324487407189,
+          "Pitch": 6300,
+          "Duration": 4.365351473922902,
+          "PeakFreq": 274.38011169433594,
+          "RootMeanSquare": 0.016466099985750084,
+          "SpectralCentroid": 1721.560129518228,
+          "SpectralRolloff": 1250.1033782958984,
+          "FundamentalFreq": 6300
+        }
+      },
+      {
+        "FilePath": "emotion_samples\\contented\\contented_2.WAV",
+        "Emotion": "contented",
+        "Features": {
+          "ZeroCrossRate": 0.016566409101205607,
+          "Energy": 0.00037690079601617263,
+          "Pitch": 8820,
+          "Duration": 4.504671201814059,
+          "PeakFreq": 276.3988494873047,
+          "RootMeanSquare": 0.019413933038314846,
+          "SpectralCentroid": 1690.6624105915316,
+          "SpectralRolloff": 1346.1616516113281,
+          "FundamentalFreq": 8820
+        }
+      }
+    ],
+    "feels very tasty": [
+      {
+        "FilePath": "emotion_samples\\feels very tasty\\feels-very-tasty_1.WAV",
+        "Emotion": "feels very tasty",
+        "Features": {
+          "ZeroCrossRate": 0.0199586314468821,
+          "Energy": 0.0006879414293442257,
+          "Pitch": 3150,
+          "Duration": 3.3436734693877552,
+          "PeakFreq": 226.43508911132812,
+          "RootMeanSquare": 0.026228637580786116,
+          "SpectralCentroid": 2382.189969446068,
+          "SpectralRolloff": 1499.249267578125,
+          "FundamentalFreq": 3150
+        }
+      },
+      {
+        "FilePath": "emotion_samples\\feels very tasty\\feels-very-tasty_2.WAV",
+        "Emotion": "feels very tasty",
+        "Features": {
+          "ZeroCrossRate": 0.01992202465463232,
+          "Energy": 0.0009431829789945538,
+          "Pitch": 11025,
+          "Duration": 3.01859410430839,
+          "PeakFreq": 235.68763732910156,
+          "RootMeanSquare": 0.03071128422900211,
+          "SpectralCentroid": 2483.3387905978348,
+          "SpectralRolloff": 1691.5340423583984,
+          "FundamentalFreq": 11025
+        }
+      },
+      {
+        "FilePath": "emotion_samples\\feels very tasty\\feels-very-tasty_3.WAV",
+        "Emotion": "feels very tasty",
+        "Features": {
+          "ZeroCrossRate": 0.024304194433555467,
+          "Energy": 0.0013430002948341562,
+          "Pitch": 3150,
+          "Duration": 3.297233560090703,
+          "PeakFreq": 254.8656463623047,
+          "RootMeanSquare": 0.03664696842624443,
+          "SpectralCentroid": 2490.1639293757403,
+          "SpectralRolloff": 1565.1947021484375,
+          "FundamentalFreq": 3150
+        }
+      }
+    ]
+  },
+  "statistics": {
+    "affectionate": {
+      "ZeroCrossRateAvg": 0.02337666665536453,
+      "RootMeanSquareAvg": 0.03486728994045997,
+      "SpectralCentroidAvg": 2753.0078759869857,
+      "SpectralRolloffAvg": 1784.2277526855469,
+      "FundamentalFreqAvg": 12862.5,
+      "DurationAvg": 4.040272108843538
+    },
+    "contented": {
+      "ZeroCrossRateAvg": 0.016384040346998856,
+      "RootMeanSquareAvg": 0.017940016512032465,
+      "SpectralCentroidAvg": 1706.1112700548797,
+      "SpectralRolloffAvg": 1298.1325149536133,
+      "FundamentalFreqAvg": 7560,
+      "DurationAvg": 4.435011337868481
+    },
+    "feels very tasty": {
+      "ZeroCrossRateAvg": 0.02139495017835663,
+      "RootMeanSquareAvg": 0.031195630078677553,
+      "SpectralCentroidAvg": 2451.8975631398807,
+      "SpectralRolloffAvg": 1585.3260040283203,
+      "FundamentalFreqAvg": 5775,
+      "DurationAvg": 3.219833711262283
+    }
+  }
+}

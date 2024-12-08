@@ -8,6 +8,7 @@
       "android",
       "web"
     ],
+    "icon": "./images/icon.png",
     "splash": {
       "image": "./images/splash.png",
       "resizeMode": "contain",
@@ -22,7 +23,8 @@
       }
     },
     "android": {
-      "package": "com.xyakim.MeowTalk"
+      "package": "com.xyakim.MeowTalk",
+      "permissions": ["MODIFY_AUDIO_SETTINGS"]
     },
     "ios": {
       "bundleIdentifier": "com.xyakim.MeowTalk"

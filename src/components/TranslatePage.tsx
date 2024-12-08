@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
@@ -14,12 +14,37 @@ export default function TranslatePage() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   async function playSound(audioFile: any) {
-    if (sound) {
-      await sound.unloadAsync();
+    try {
+      // 确保音频模块已初始化
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+      });
+
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      // 修改这部分逻辑
+      let audioSource = audioFile;
+      if (Platform.OS !== 'web') {
+        if (typeof audioFile === 'string') {
+          if (audioFile.startsWith('http')) {
+            audioSource = { uri: audioFile };
+          } else {
+            // 本地音频文件应该已经是 require 的结果
+            audioSource = audioFile;
+          }
+        }
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(audioSource);
+      setSound(newSound);
+      await newSound.playAsync();
+    } catch (error) {
+      console.error('Error playing sound:', error);
     }
-    const { sound: newSound } = await Audio.Sound.createAsync(audioFile);
-    setSound(newSound);
-    await newSound.playAsync();
   }
 
   const handleEmotionSelect = (emotion: Emotion) => {
@@ -38,7 +63,7 @@ export default function TranslatePage() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>MeowTalk</Text>
-        <Text style={styles.subHeaderText}>选择情绪</Text>
+        <Text style={styles.subHeaderText}>Select Emotion</Text>
       </View>
       <View style={styles.tabContainer}>
         {emotionCategories.map((category) => (
