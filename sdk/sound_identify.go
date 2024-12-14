@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"math"
 	"os"
 )
@@ -11,29 +10,6 @@ import (
 type AudioData struct {
 	Samples    []float64
 	SampleRate int
-}
-
-// AudioFeature 存储提取的特征
-type AudioFeature struct {
-	ZeroCrossRate float64
-	Energy        float64
-	Pitch         float64
-	Duration      float64
-	PeakFreq      float64
-}
-
-// EmotionSamples 存储每种情感的样本集
-type EmotionSamples struct {
-	Emotion         string
-	Features        []AudioFeature
-	MeanFeature     AudioFeature
-	StdDevFeature   AudioFeature
-	UpdatedFeatures bool
-}
-
-// SampleLibrary 样本库
-type SampleLibrary struct {
-	emotions map[string]*EmotionSamples
 }
 
 // FeatureExtractor 特征提取器
@@ -92,15 +68,23 @@ func LoadWavFile(filename string) (*AudioData, error) {
 }
 
 // Extract 提取特征
-func (fe *FeatureExtractor) Extract(audio *AudioData) AudioFeature {
+func (fe *FeatureExtractor) Extract(audio *AudioData) map[string]float64 {
 	frames := fe.splitFrames(audio.Samples)
 
-	feature := AudioFeature{
-		ZeroCrossRate: fe.calculateZeroCrossRate(audio.Samples),
-		Energy:        fe.calculateEnergy(audio.Samples),
-		Pitch:         fe.estimatePitch(audio.Samples),
-		Duration:      float64(len(audio.Samples)) / float64(audio.SampleRate),
-		PeakFreq:      fe.calculatePeakFrequency(audio.Samples),
+	// 基于分帧计算特征
+	var totalZCR, totalEnergy float64
+	for _, frame := range frames {
+		totalZCR += fe.calculateZeroCrossRate(frame)
+		totalEnergy += fe.calculateEnergy(frame)
+	}
+
+	numFrames := float64(len(frames))
+	feature := map[string]float64{
+		"ZeroCrossRate": totalZCR / numFrames,    // 使用帧平均值
+		"Energy":        totalEnergy / numFrames, // 使用帧平均值
+		"Pitch":         fe.estimatePitch(audio.Samples),
+		"Duration":      float64(len(audio.Samples)) / float64(audio.SampleRate),
+		"PeakFreq":      fe.calculatePeakFrequency(audio.Samples),
 	}
 
 	return feature
@@ -226,155 +210,4 @@ func cmplxSub(a, b complex128) complex128 {
 
 func cmplxAbs(a complex128) float64 {
 	return math.Sqrt(real(a)*real(a) + imag(a)*imag(a))
-}
-
-// NewSampleLibrary 创建新的样本库
-func NewSampleLibrary() *SampleLibrary {
-	return &SampleLibrary{
-		emotions: make(map[string]*EmotionSamples),
-	}
-}
-
-// AddSample 添加样本
-func (sl *SampleLibrary) AddSample(emotion string, feature AudioFeature) {
-	if _, exists := sl.emotions[emotion]; !exists {
-		sl.emotions[emotion] = &EmotionSamples{
-			Emotion:  emotion,
-			Features: make([]AudioFeature, 0),
-		}
-	}
-	sl.emotions[emotion].Features = append(sl.emotions[emotion].Features, feature)
-	sl.emotions[emotion].UpdatedFeatures = true
-}
-
-// SaveToFile 保存样本库到文件
-func (sl *SampleLibrary) SaveToFile(filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	return encoder.Encode(sl.emotions)
-}
-
-// LoadFromFile 从文件加载样本库
-func (sl *SampleLibrary) LoadFromFile(filename string) error {
-	file, err := os.Open(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	decoder := json.NewDecoder(file)
-	return decoder.Decode(&sl.emotions)
-}
-
-// updateEmotionStats 更新情感统计信息
-func (sl *SampleLibrary) updateEmotionStats(emotion string) {
-	samples := sl.emotions[emotion]
-	if !samples.UpdatedFeatures {
-		return
-	}
-
-	var sumFeature AudioFeature
-	count := float64(len(samples.Features))
-
-	// 计算平均值
-	for _, f := range samples.Features {
-		sumFeature.ZeroCrossRate += f.ZeroCrossRate
-		sumFeature.Energy += f.Energy
-		sumFeature.Pitch += f.Pitch
-		sumFeature.Duration += f.Duration
-		sumFeature.PeakFreq += f.PeakFreq
-	}
-
-	samples.MeanFeature = AudioFeature{
-		ZeroCrossRate: sumFeature.ZeroCrossRate / count,
-		Energy:        sumFeature.Energy / count,
-		Pitch:         sumFeature.Pitch / count,
-		Duration:      sumFeature.Duration / count,
-		PeakFreq:      sumFeature.PeakFreq / count,
-	}
-
-	// 计算标准差
-	var sumSquareDiff AudioFeature
-	for _, f := range samples.Features {
-		sumSquareDiff.ZeroCrossRate += math.Pow(f.ZeroCrossRate-samples.MeanFeature.ZeroCrossRate, 2)
-		sumSquareDiff.Energy += math.Pow(f.Energy-samples.MeanFeature.Energy, 2)
-		sumSquareDiff.Pitch += math.Pow(f.Pitch-samples.MeanFeature.Pitch, 2)
-		sumSquareDiff.Duration += math.Pow(f.Duration-samples.MeanFeature.Duration, 2)
-		sumSquareDiff.PeakFreq += math.Pow(f.PeakFreq-samples.MeanFeature.PeakFreq, 2)
-	}
-
-	samples.StdDevFeature = AudioFeature{
-		ZeroCrossRate: math.Sqrt(sumSquareDiff.ZeroCrossRate / count),
-		Energy:        math.Sqrt(sumSquareDiff.Energy / count),
-		Pitch:         math.Sqrt(sumSquareDiff.Pitch / count),
-		Duration:      math.Sqrt(sumSquareDiff.Duration / count),
-		PeakFreq:      math.Sqrt(sumSquareDiff.PeakFreq / count),
-	}
-
-	samples.UpdatedFeatures = false
-}
-
-// Match 匹配音频特征
-func (sl *SampleLibrary) Match(feature AudioFeature) (string, float64) {
-	var bestMatch string
-	var maxScore float64 = -1
-
-	for emotion, samples := range sl.emotions {
-		sl.updateEmotionStats(emotion)
-
-		// 计算与该情感所有样本的最小距离
-		minDistance := math.MaxFloat64
-		for _, sampleFeature := range samples.Features {
-			distance := calculateEuclideanDistance(feature, sampleFeature)
-			if distance < minDistance {
-				minDistance = distance
-			}
-		}
-
-		// 计算马氏距离
-		mahalanobisDistance := calculateMahalanobisDistance(
-			feature,
-			samples.MeanFeature,
-			samples.StdDevFeature,
-		)
-
-		// 综合评分
-		score := 0.6*(1.0/(1.0+minDistance)) + 0.4*(1.0/(1.0+mahalanobisDistance))
-
-		if score > maxScore {
-			maxScore = score
-			bestMatch = emotion
-		}
-	}
-
-	return bestMatch, maxScore
-}
-
-// calculateEuclideanDistance 计算欧氏距离
-func calculateEuclideanDistance(f1, f2 AudioFeature) float64 {
-	return math.Sqrt(
-		math.Pow(f1.ZeroCrossRate-f2.ZeroCrossRate, 2) +
-			math.Pow(f1.Energy-f2.Energy, 2) +
-			math.Pow(f1.Pitch-f2.Pitch, 2) +
-			math.Pow(f1.Duration-f2.Duration, 2) +
-			math.Pow(f1.PeakFreq-f2.PeakFreq, 2),
-	)
-}
-
-// calculateMahalanobisDistance 计算马氏距离
-func calculateMahalanobisDistance(feature, mean, stdDev AudioFeature) float64 {
-	const epsilon = 1e-10
-
-	return math.Sqrt(
-		math.Pow((feature.ZeroCrossRate-mean.ZeroCrossRate)/(stdDev.ZeroCrossRate+epsilon), 2) +
-			math.Pow((feature.Energy-mean.Energy)/(stdDev.Energy+epsilon), 2) +
-			math.Pow((feature.Pitch-mean.Pitch)/(stdDev.Pitch+epsilon), 2) +
-			math.Pow((feature.Duration-mean.Duration)/(stdDev.Duration+epsilon), 2) +
-			math.Pow((feature.PeakFreq-mean.PeakFreq)/(stdDev.PeakFreq+epsilon), 2),
-	)
 }
