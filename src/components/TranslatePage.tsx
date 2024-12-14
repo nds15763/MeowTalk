@@ -4,18 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
+import AudioRecorder from './AudioRecorder';
 
 const windowWidth = Dimensions.get('window').width;
-const buttonWidth = (windowWidth - 40) / 3; // 40 是左右边距和按钮之间的间隔
+const buttonWidth = (windowWidth - 40) / 3;
 
 export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory>(emotionCategories[1]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [detectedEmotion, setDetectedEmotion] = useState<any>(null);
 
   async function playSound(audioFile: any) {
     try {
-      // 确保音频模块已初始化
       await Audio.setAudioModeAsync({
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
@@ -26,14 +27,12 @@ export default function TranslatePage() {
         await sound.unloadAsync();
       }
 
-      // 修改这部分逻辑
       let audioSource = audioFile;
       if (Platform.OS !== 'web') {
         if (typeof audioFile === 'string') {
           if (audioFile.startsWith('http')) {
             audioSource = { uri: audioFile };
           } else {
-            // 本地音频文件应该已经是 require 的结果
             audioSource = audioFile;
           }
         }
@@ -59,12 +58,21 @@ export default function TranslatePage() {
     setSelectedEmotion(null);
   };
 
+  const handleEmotionDetected = (result: any) => {
+    setDetectedEmotion(result);
+    // TODO: 可以根据检测结果自动选择对应的情感类别
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>MeowTalk</Text>
         <Text style={styles.subHeaderText}>Select Emotion</Text>
       </View>
+
+      {/* 添加录音组件 */}
+      <AudioRecorder onEmotionDetected={handleEmotionDetected} />
+
       <View style={styles.tabContainer}>
         {emotionCategories.map((category) => (
           <TouchableOpacity
@@ -79,6 +87,7 @@ export default function TranslatePage() {
           </TouchableOpacity>
         ))}
       </View>
+
       <ScrollView contentContainerStyle={styles.emotionsContainer}>
         {emotions
           .filter((emotion) => emotion.categoryId === selectedCategory.id)
@@ -98,6 +107,7 @@ export default function TranslatePage() {
             </TouchableOpacity>
           ))}
       </ScrollView>
+
       {selectedEmotion && (
         <View style={styles.descriptionContainer}>
           <Text style={styles.descriptionText}>{selectedEmotion.description}</Text>
@@ -121,60 +131,59 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   subHeaderText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#666',
+    marginTop: 5,
   },
   tabContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
   tabButton: {
+    flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
   selectedTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#FF69B4',
+    borderBottomColor: '#ff4081',
   },
   tabTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
   },
   emotionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
     padding: 10,
   },
   emotionButton: {
-    borderRadius: 10,
-    backgroundColor: '#FF69B4',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
     marginRight: 10,
+    marginBottom: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
   },
   selectedEmotion: {
-    backgroundColor: '#FF1493',
+    backgroundColor: '#ffe0e9',
   },
   emotionIcon: {
     fontSize: 24,
+    marginBottom: 5,
   },
   emotionTitle: {
-    marginTop: 5,
-    color: '#fff',
-    fontWeight: 'bold',
     fontSize: 12,
-    textAlign: 'center',
   },
   descriptionContainer: {
     padding: 20,
-    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
   },
   descriptionText: {
     fontSize: 16,
+    color: '#333',
     textAlign: 'center',
   },
   lastInRow: {

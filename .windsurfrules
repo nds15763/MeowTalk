@@ -1,0 +1,3 @@
+<rule>workspace.md文件是记录整个工程的架构还有各个模块的功能、以及其他项目的信息</rule>
+<rule>workon.md文件存储的是当前工作的模块、任务，以及对待实现的Todo打赏标记</rule>
+<rule>每次执行问答前必须阅读workon、workspace文件，问答过后需要回写这两个文件</rule>
