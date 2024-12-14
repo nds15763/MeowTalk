@@ -18,7 +18,6 @@ func NewSampleProcessor() *SampleProcessor {
 		Library: &SampleLibrary{
 			Samples:    make(map[string][]AudioSample),
 			Statistics: make(map[string]EmotionStatistics),
-			NeedUpdate: true,
 		},
 		SampleRate:  44100, // 默认采样率
 		WindowSize:  1024,  // 默认窗口大小
@@ -358,125 +357,72 @@ func (p *SampleProcessor) calculateStatistics() {
 			continue
 		}
 
-		// 初始化统计结构
 		stats := EmotionStatistics{
 			SampleCount: len(samples),
 			MeanFeature: AudioFeature{},
 			StdDevFeature: AudioFeature{},
 		}
 
-		// 1. 计算均值
+		// 计算平均值
 		for _, sample := range samples {
-			addFeatures(&stats.MeanFeature, &sample.Features)
+			stats.MeanFeature.ZeroCrossRate += sample.Features.ZeroCrossRate
+			stats.MeanFeature.Energy += sample.Features.Energy
+			stats.MeanFeature.Pitch += sample.Features.Pitch
+			stats.MeanFeature.Duration += sample.Features.Duration
+			stats.MeanFeature.PeakFreq += sample.Features.PeakFreq
+			stats.MeanFeature.RootMeanSquare += sample.Features.RootMeanSquare
+			stats.MeanFeature.SpectralCentroid += sample.Features.SpectralCentroid
+			stats.MeanFeature.SpectralRolloff += sample.Features.SpectralRolloff
+			stats.MeanFeature.FundamentalFreq += sample.Features.FundamentalFreq
 		}
-		divideFeatures(&stats.MeanFeature, float64(stats.SampleCount))
 
-		// 2. 计算标准差
+		count := float64(len(samples))
+		stats.MeanFeature.ZeroCrossRate /= count
+		stats.MeanFeature.Energy /= count
+		stats.MeanFeature.Pitch /= count
+		stats.MeanFeature.Duration /= count
+		stats.MeanFeature.PeakFreq /= count
+		stats.MeanFeature.RootMeanSquare /= count
+		stats.MeanFeature.SpectralCentroid /= count
+		stats.MeanFeature.SpectralRolloff /= count
+		stats.MeanFeature.FundamentalFreq /= count
+
+		// 计算标准差
 		for _, sample := range samples {
-			// 计算差值的平方
-			diff := subtractFeatures(&sample.Features, &stats.MeanFeature)
-			squareDiff := squareFeatures(diff)
-			addFeatures(&stats.StdDevFeature, &squareDiff)
+			stats.StdDevFeature.ZeroCrossRate += math.Pow(sample.Features.ZeroCrossRate-stats.MeanFeature.ZeroCrossRate, 2)
+			stats.StdDevFeature.Energy += math.Pow(sample.Features.Energy-stats.MeanFeature.Energy, 2)
+			stats.StdDevFeature.Pitch += math.Pow(sample.Features.Pitch-stats.MeanFeature.Pitch, 2)
+			stats.StdDevFeature.Duration += math.Pow(sample.Features.Duration-stats.MeanFeature.Duration, 2)
+			stats.StdDevFeature.PeakFreq += math.Pow(sample.Features.PeakFreq-stats.MeanFeature.PeakFreq, 2)
+			stats.StdDevFeature.RootMeanSquare += math.Pow(sample.Features.RootMeanSquare-stats.MeanFeature.RootMeanSquare, 2)
+			stats.StdDevFeature.SpectralCentroid += math.Pow(sample.Features.SpectralCentroid-stats.MeanFeature.SpectralCentroid, 2)
+			stats.StdDevFeature.SpectralRolloff += math.Pow(sample.Features.SpectralRolloff-stats.MeanFeature.SpectralRolloff, 2)
+			stats.StdDevFeature.FundamentalFreq += math.Pow(sample.Features.FundamentalFreq-stats.MeanFeature.FundamentalFreq, 2)
 		}
-		
-		// 计算方差并开方得到标准差
-		divideFeatures(&stats.StdDevFeature, float64(stats.SampleCount))
-		stats.StdDevFeature = sqrtFeatures(stats.StdDevFeature)
+
+		stats.StdDevFeature.ZeroCrossRate = math.Sqrt(stats.StdDevFeature.ZeroCrossRate / count)
+		stats.StdDevFeature.Energy = math.Sqrt(stats.StdDevFeature.Energy / count)
+		stats.StdDevFeature.Pitch = math.Sqrt(stats.StdDevFeature.Pitch / count)
+		stats.StdDevFeature.Duration = math.Sqrt(stats.StdDevFeature.Duration / count)
+		stats.StdDevFeature.PeakFreq = math.Sqrt(stats.StdDevFeature.PeakFreq / count)
+		stats.StdDevFeature.RootMeanSquare = math.Sqrt(stats.StdDevFeature.RootMeanSquare / count)
+		stats.StdDevFeature.SpectralCentroid = math.Sqrt(stats.StdDevFeature.SpectralCentroid / count)
+		stats.StdDevFeature.SpectralRolloff = math.Sqrt(stats.StdDevFeature.SpectralRolloff / count)
+		stats.StdDevFeature.FundamentalFreq = math.Sqrt(stats.StdDevFeature.FundamentalFreq / count)
 
 		// 存储统计结果
 		p.Library.Statistics[emotion] = stats
-		
-		// 打印调试信息
-		logEmotionStats(emotion, &stats)
+
+		// 打印统计信息
+		fmt.Printf("情感 %s 的统计特征:\n", emotion)
+		fmt.Printf("  样本数量: %d\n", stats.SampleCount)
+		fmt.Printf("  平均过零率: %.4f (std: %.4f)\n", stats.MeanFeature.ZeroCrossRate, stats.StdDevFeature.ZeroCrossRate)
+		fmt.Printf("  平均均方根: %.4f (std: %.4f)\n", stats.MeanFeature.RootMeanSquare, stats.StdDevFeature.RootMeanSquare)
+		fmt.Printf("  平均频谱质心: %.4f (std: %.4f)\n", stats.MeanFeature.SpectralCentroid, stats.StdDevFeature.SpectralCentroid)
+		fmt.Printf("  平均频谱衰减: %.4f (std: %.4f)\n", stats.MeanFeature.SpectralRolloff, stats.StdDevFeature.SpectralRolloff)
+		fmt.Printf("  平均基频: %.4f (std: %.4f)\n", stats.MeanFeature.FundamentalFreq, stats.StdDevFeature.FundamentalFreq)
+		fmt.Printf("  平均持续时间: %.4f秒 (std: %.4f)\n", stats.MeanFeature.Duration, stats.StdDevFeature.Duration)
 	}
-}
-
-// 特征向量运算辅助函数
-func addFeatures(a *AudioFeature, b *AudioFeature) {
-	a.ZeroCrossRate += b.ZeroCrossRate
-	a.Energy += b.Energy
-	a.Pitch += b.Pitch
-	a.Duration += b.Duration
-	a.PeakFreq += b.PeakFreq
-	a.RootMeanSquare += b.RootMeanSquare
-	a.SpectralCentroid += b.SpectralCentroid
-	a.SpectralRolloff += b.SpectralRolloff
-	a.FundamentalFreq += b.FundamentalFreq
-}
-
-func divideFeatures(a *AudioFeature, n float64) {
-	a.ZeroCrossRate /= n
-	a.Energy /= n
-	a.Pitch /= n
-	a.Duration /= n
-	a.PeakFreq /= n
-	a.RootMeanSquare /= n
-	a.SpectralCentroid /= n
-	a.SpectralRolloff /= n
-	a.FundamentalFreq /= n
-}
-
-func subtractFeatures(a *AudioFeature, b *AudioFeature) AudioFeature {
-	return AudioFeature{
-		ZeroCrossRate:    a.ZeroCrossRate - b.ZeroCrossRate,
-		Energy:           a.Energy - b.Energy,
-		Pitch:            a.Pitch - b.Pitch,
-		Duration:         a.Duration - b.Duration,
-		PeakFreq:         a.PeakFreq - b.PeakFreq,
-		RootMeanSquare:   a.RootMeanSquare - b.RootMeanSquare,
-		SpectralCentroid: a.SpectralCentroid - b.SpectralCentroid,
-		SpectralRolloff:  a.SpectralRolloff - b.SpectralRolloff,
-		FundamentalFreq:  a.FundamentalFreq - b.FundamentalFreq,
-	}
-}
-
-func squareFeatures(a AudioFeature) AudioFeature {
-	return AudioFeature{
-		ZeroCrossRate:    a.ZeroCrossRate * a.ZeroCrossRate,
-		Energy:           a.Energy * a.Energy,
-		Pitch:            a.Pitch * a.Pitch,
-		Duration:         a.Duration * a.Duration,
-		PeakFreq:         a.PeakFreq * a.PeakFreq,
-		RootMeanSquare:   a.RootMeanSquare * a.RootMeanSquare,
-		SpectralCentroid: a.SpectralCentroid * a.SpectralCentroid,
-		SpectralRolloff:  a.SpectralRolloff * a.SpectralRolloff,
-		FundamentalFreq:  a.FundamentalFreq * a.FundamentalFreq,
-	}
-}
-
-func sqrtFeatures(a AudioFeature) AudioFeature {
-	return AudioFeature{
-		ZeroCrossRate:    math.Sqrt(a.ZeroCrossRate),
-		Energy:           math.Sqrt(a.Energy),
-		Pitch:            math.Sqrt(a.Pitch),
-		Duration:         math.Sqrt(a.Duration),
-		PeakFreq:         math.Sqrt(a.PeakFreq),
-		RootMeanSquare:   math.Sqrt(a.RootMeanSquare),
-		SpectralCentroid: math.Sqrt(a.SpectralCentroid),
-		SpectralRolloff:  math.Sqrt(a.SpectralRolloff),
-		FundamentalFreq:  math.Sqrt(a.FundamentalFreq),
-	}
-}
-
-func logEmotionStats(emotion string, stats *EmotionStatistics) {
-	fmt.Printf("\n情感 %s 的统计特征:\n", emotion)
-	fmt.Printf("样本数量: %d\n", stats.SampleCount)
-	fmt.Printf("均值特征:\n")
-	logFeatures(&stats.MeanFeature)
-	fmt.Printf("标准差特征:\n")
-	logFeatures(&stats.StdDevFeature)
-}
-
-func logFeatures(f *AudioFeature) {
-	fmt.Printf("  过零率: %.4f\n", f.ZeroCrossRate)
-	fmt.Printf("  能量: %.4f\n", f.Energy)
-	fmt.Printf("  音高: %.4f\n", f.Pitch)
-	fmt.Printf("  持续时间: %.4f\n", f.Duration)
-	fmt.Printf("  峰值频率: %.4f\n", f.PeakFreq)
-	fmt.Printf("  均方根: %.4f\n", f.RootMeanSquare)
-	fmt.Printf("  频谱质心: %.4f\n", f.SpectralCentroid)
-	fmt.Printf("  频谱衰减: %.4f\n", f.SpectralRolloff)
-	fmt.Printf("  基频: %.4f\n", f.FundamentalFreq)
 }
 
 // ProcessDirectory 处理指定目录下的所有音频文件
@@ -540,6 +486,25 @@ func (p *SampleProcessor) ExportLibrary(outputPath string) error {
 		return fmt.Errorf("样本库为空，无法导出")
 	}
 
+	// 创建输出目录（如果不存在）
+	outputDir := filepath.Dir(outputPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("创建输出目录失败: %v", err)
+	}
+
+	// 准备导出数据
+	type ExportData struct {
+		TotalSamples int                          `json:"totalSamples"`
+		Emotions     []string                     `json:"emotions"`
+		Samples      map[string][]AudioSample     `json:"samples"`
+		Statistics   map[string]EmotionStatistics `json:"statistics"`
+	}
+
+	exportData := ExportData{
+		Samples:    p.Library.Samples,
+		Statistics: p.Library.Statistics,
+	}
+
 	// 计算总样本数和情感列表
 	emotions := make([]string, 0, len(p.Library.Samples))
 	totalSamples := 0
@@ -547,34 +512,23 @@ func (p *SampleProcessor) ExportLibrary(outputPath string) error {
 		emotions = append(emotions, emotion)
 		totalSamples += len(samples)
 	}
+	exportData.TotalSamples = totalSamples
+	exportData.Emotions = emotions
 
-	// 准备导出数据
-	type ExportData struct {
-		TotalSamples int                           `json:"totalSamples"`
-		Emotions     []string                      `json:"emotions"`
-		Samples      map[string][]AudioSample      `json:"samples"`
-		Statistics   map[string]EmotionStatistics  `json:"statistics"`
-	}
-
-	exportData := ExportData{
-		TotalSamples: totalSamples,
-		Emotions:     emotions,
-		Samples:      p.Library.Samples,
-		Statistics:   p.Library.Statistics,
-	}
-
-	// 将数据编码为JSON
-	jsonData, err := json.MarshalIndent(exportData, "", "  ")
+	// 格式化JSON并写入文件
+	data, err := json.MarshalIndent(exportData, "", "  ")
 	if err != nil {
 		return fmt.Errorf("JSON编码失败: %v", err)
 	}
 
-	// 写入文件
-	if err := os.WriteFile(outputPath, jsonData, 0644); err != nil {
+	if err := os.WriteFile(outputPath, data, 0644); err != nil {
 		return fmt.Errorf("写入文件失败: %v", err)
 	}
 
-	fmt.Printf("样本库已导出到 %s\n", outputPath)
+	fmt.Printf("样本库已导出到: %s\n", outputPath)
+	fmt.Printf("总样本数: %d\n", totalSamples)
+	fmt.Printf("情感类别: %v\n", emotions)
+
 	return nil
 }
 

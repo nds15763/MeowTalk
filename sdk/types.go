@@ -30,16 +30,6 @@ type EmotionStatistics struct {
 	StdDevFeature AudioFeature // 标准差
 }
 
-// FeatureStatistics 特征统计
-type FeatureStatistics struct {
-	ZeroCrossRateAvg    float64 // 过零率平均值
-	RootMeanSquareAvg   float64 // 均方根平均值
-	SpectralCentroidAvg float64 // 频谱质心平均值
-	SpectralRolloffAvg  float64 // 频谱衰减点平均值
-	FundamentalFreqAvg  float64 // 基频平均值
-	DurationAvg         float64 // 持续时间平均值
-}
-
 // SampleLibrary 样本库
 type SampleLibrary struct {
 	Samples    map[string][]AudioSample     // 按情感类型存储的原始样本
