@@ -20,6 +20,12 @@ export default function HomePage() {
       >
         <Text style={styles.buttonText}>Translate</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, { marginTop: 10, backgroundColor: '#4CAF50' }]}
+        onPress={() => navigation.navigate('TestAudio' as never)}
+      >
+        <Text style={styles.buttonText}>Test Audio</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }

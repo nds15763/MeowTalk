@@ -18,9 +18,11 @@ interface EmotionResult {
 
 interface AudioRecorderProps {
   onEmotionDetected?: (result: EmotionResult) => void;
+  onAudioData?: (data: any) => void;
+  onRecordingState?: (recording: boolean) => void;
 }
 
-export default function AudioRecorder({ onEmotionDetected }: AudioRecorderProps) {
+export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecordingState }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [currentVolume, setCurrentVolume] = useState(0);
@@ -29,14 +31,25 @@ export default function AudioRecorder({ onEmotionDetected }: AudioRecorderProps)
   // 开始录音
   const startRecording = async () => {
     try {
+      console.log('准备开始录音...');
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         staysActiveInBackground: true,
         shouldDuckAndroid: true,
       });
+      console.log('音频模式设置完成');
+
+      const permissionResponse = await Audio.requestPermissionsAsync();
+      console.log('麦克风权限状态:', permissionResponse.status);
+      if (permissionResponse.status !== 'granted') {
+        console.error('未获得麦克风权限');
+        return;
+      }
 
       const newRecording = new Audio.Recording();
+      console.log('创建录音实例');
+
       await newRecording.prepareToRecordAsync({
         android: {
           ...AUDIO_CONFIG,
@@ -53,25 +66,37 @@ export default function AudioRecorder({ onEmotionDetected }: AudioRecorderProps)
           bitRate: 16 * 44100,
         },
         web: {
-          ...AUDIO_CONFIG,
           mimeType: 'audio/webm',
           bitsPerSecond: 128000,
-        },
-      });
-
-      newRecording.setOnRecordingStatusUpdate(status => {
-        if (status.isRecording) {
-          setCurrentVolume(status.metering || 0);
-          // TODO: 处理音频数据
-          // processAudioData(status.metering || 0);
         }
       });
+      console.log('录音配置完成');
+
+      newRecording.setOnRecordingStatusUpdate(status => {
+        console.log('录音状态更新:', status);
+        if (status.isRecording) {
+          setCurrentVolume(status.metering || 0);
+          if (onAudioData) {
+            onAudioData({
+              metering: status.metering || 0,
+              durationMillis: status.durationMillis,
+              isRecording: status.isRecording,
+              isDoneRecording: status.isDoneRecording,
+            });
+          }
+        }
+      });
+      console.log('设置状态监听器');
 
       await newRecording.startAsync();
+      console.log('开始录音');
       setRecording(newRecording);
       setIsRecording(true);
+      if (onRecordingState) {
+        onRecordingState(true);
+      }
     } catch (error) {
-      console.error('Failed to start recording', error);
+      console.error('录音失败:', error);
     }
   };
 
@@ -84,6 +109,9 @@ export default function AudioRecorder({ onEmotionDetected }: AudioRecorderProps)
       const uri = recording.getURI();
       setRecording(null);
       setIsRecording(false);
+      if (onRecordingState) {
+        onRecordingState(false);
+      }
 
       // TODO: 发送录音文件到 Native Bridge 处理
       // const result = await MeowTalkBridge.processAudioFile(uri);
