@@ -1,14 +1,32 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform } from 'react-native';
-import { Audio } from 'expo-av';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, PermissionsAndroid } from 'react-native';
+import AudioRecorderPlayer, {
+  AVEncoderAudioQualityIOSType,
+  AVEncodingOption,
+  AudioSourceAndroidType,
+  OutputFormatAndroidType,
+  AudioEncoderAndroidType,
+  AudioSet
+} from 'react-native-audio-recorder-player';
 
 // 音频配置
-const AUDIO_CONFIG = {
-  sampleRate: 44100,
-  channels: 1,
-  bitsPerSample: 16,
-  bufferSize: 4096
-};
+const AUDIO_CONFIG: AudioSet = Platform.select({
+  ios: {
+    AVSampleRateKeyIOS: 44100,
+    AVNumberOfChannelsKeyIOS: 1,
+    AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+    AVEncoderBitRateKeyIOS: 128000,
+    AVFormatIDKeyIOS: AVEncodingOption.aac
+  },
+  android: {
+    AudioSourceAndroid: AudioSourceAndroidType.MIC,
+    OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,
+    AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+    AudioEncodingBitRateAndroid: 128000,
+    AudioSamplingRateAndroid: 44100,
+    AudioChannelsAndroid: 1
+  }
+}) || {};
 
 interface EmotionResult {
   emotion: string;
@@ -20,109 +38,261 @@ interface AudioRecorderProps {
   onEmotionDetected?: (result: EmotionResult) => void;
   onAudioData?: (data: any) => void;
   onRecordingState?: (recording: boolean) => void;
+  onLog?: (message: string) => void;
 }
 
-export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecordingState }: AudioRecorderProps) {
+// 在文件顶部添加 Web 平台检测
+const isWeb = Platform.OS === 'web';
+
+export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecordingState, onLog }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [currentVolume, setCurrentVolume] = useState(0);
   const [emotionResult, setEmotionResult] = useState<EmotionResult | null>(null);
+  const [audioRecorderPlayer] = useState(new AudioRecorderPlayer());
+  const [recordingPath, setRecordingPath] = useState<string>('');
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
-  // 开始录音
+  // 将 monitorVolume 移到组件顶层
+  const monitorVolume = useCallback((startTime: number) => {
+    console.log('monitorVolume 被调用，初始状态:', {
+      isRecording,
+      hasAnalyser: !!analyser,
+      analyserState: analyser ? 'active' : 'null'
+    });
+
+    if (analyser && isRecording) {
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(dataArray);
+      
+      const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
+      const volume = average / 255;
+      
+      console.log('音频数据:', {
+        frequencyBinCount: analyser.frequencyBinCount,
+        average,
+        volume,
+        dataArrayLength: dataArray.length,
+        someValues: dataArray.slice(0, 5)
+      });
+      
+      setCurrentVolume(volume);
+      onAudioData?.({
+        metering: volume,
+        isRecording: true,
+        durationMillis: Date.now() - startTime,
+        isDoneRecording: false
+      });
+
+      requestAnimationFrame(() => monitorVolume(startTime));
+    } else {
+      console.log('monitorVolume 条件检查失败:', {
+        isRecording,
+        hasAnalyser: !!analyser,
+        analyserState: analyser ? 'active' : 'null'
+      });
+    }
+  }, [isRecording, analyser, onAudioData]);
+
+  // 请求录音权限
+  const requestPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const grants = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        ]);
+
+        const granted = 
+          grants['android.permission.WRITE_EXTERNAL_STORAGE'] === PermissionsAndroid.RESULTS.GRANTED &&
+          grants['android.permission.READ_EXTERNAL_STORAGE'] === PermissionsAndroid.RESULTS.GRANTED &&
+          grants['android.permission.RECORD_AUDIO'] === PermissionsAndroid.RESULTS.GRANTED;
+
+        if (!granted) {
+          console.error('未获得所需权限');
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error('权限请求错误:', err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Web 平台的录音实现
+  const startWebRecording = async () => {
+    try {
+      // 检查 API 是否可用
+      console.log('检查 mediaDevices API:', {
+        hasMediaDevices: !!navigator.mediaDevices,
+        hasGetUserMedia: !!navigator.mediaDevices?.getUserMedia
+      });
+
+      // 尝试获取媒体流
+      console.log('正在请求音频权限...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      console.log('获取到音频流:', stream);
+      const recorder = new MediaRecorder(stream);
+      setMediaRecorder(recorder);
+      setAudioChunks([]);
+
+      // 创建音频分析器
+      const context = new AudioContext();
+      const source = context.createMediaStreamSource(stream);
+      const analyserNode = context.createAnalyser();
+      source.connect(analyserNode);
+      setAudioContext(context);
+      setAnalyser(analyserNode);
+
+      
+      // 开始音量监测
+      const startTime = Date.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setAudioChunks(chunks => [...chunks, event.data]);
+        }
+      };
+
+      recorder.onstart = () => {
+        console.log('录音开始事件触发');
+        setIsRecording(true);
+        onRecordingState?.(true);
+        onLog?.('Web 录音开始');
+      };
+
+      recorder.onstop = () => {
+        console.log('录音停止事件触发');
+        onRecordingState?.(false);
+        onLog?.('Web 录音停止');
+        
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        onAudioData?.({
+          url: audioUrl,
+          blob: audioBlob,
+          isRecording: false,
+          isDoneRecording: true,
+          durationMillis: Date.now() - startTime
+        });
+
+        // 清理音频上下文
+        if (audioContext) {
+          audioContext.close();
+          setAudioContext(null);
+          setAnalyser(null);
+        }
+      };
+
+      recorder.start(100); // 每100ms触发一次ondataavailable
+    } catch (error: any) {
+      console.error('Web 录音失败:', error);
+      onLog?.(`Web 录音失败: ${error.message}`);
+    }
+  };
+
+  const stopWebRecording = () => {
+    console.log('停止录音，当前状态:', { isRecording, hasMediaRecorder: !!mediaRecorder });
+    
+    if (mediaRecorder && isRecording) {
+      try {
+        // 1. 首先更新状态
+        setIsRecording(false);
+        
+        // 2. 停止所有音频轨道
+        mediaRecorder.stream.getTracks().forEach(track => {
+          console.log('停止音频轨道:', track.kind);
+          track.stop();
+        });
+        
+        // 3. 停止 MediaRecorder
+        mediaRecorder.stop();
+        
+        // 4. 清理音频上下文
+        if (audioContext) {
+          audioContext.close().then(() => {
+            console.log('音频上下文已关闭');
+          }).catch(err => {
+            console.error('关闭音频上下文失败:', err);
+          });
+        }
+        
+        // 5. 重置所有状态
+        setAudioContext(null);
+        setAnalyser(null);
+        setMediaRecorder(null);
+        
+        console.log('所有音频资源已清理');
+      } catch (error) {
+        console.error('停止录音时出错:', error);
+      }
+    }
+  };
+
+  // 修改开始录音函数
   const startRecording = async () => {
-    try {
-      console.log('准备开始录音...');
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-      });
-      console.log('音频模式设置完成');
-
-      const permissionResponse = await Audio.requestPermissionsAsync();
-      console.log('麦克风权限状态:', permissionResponse.status);
-      if (permissionResponse.status !== 'granted') {
-        console.error('未获得麦克风权限');
-        return;
-      }
-
-      const newRecording = new Audio.Recording();
-      console.log('创建录音实例');
-
-      await newRecording.prepareToRecordAsync({
-        android: {
-          ...AUDIO_CONFIG,
-          extension: '.wav',
-          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
-          audioEncoder: Audio.AndroidAudioEncoder.AAC,
-        },
-        ios: {
-          ...AUDIO_CONFIG,
-          extension: '.wav',
-          outputFormat: Audio.IOSOutputFormat.LINEARPCM,
-          audioQuality: Audio.IOSAudioQuality.HIGH,
-          numberOfChannels: AUDIO_CONFIG.channels,
-          bitRate: 16 * 44100,
-        },
-        web: {
-          mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
-        }
-      });
-      console.log('录音配置完成');
-
-      newRecording.setOnRecordingStatusUpdate(status => {
-        console.log('录音状态更新:', status);
-        if (status.isRecording) {
-          setCurrentVolume(status.metering || 0);
-          if (onAudioData) {
-            onAudioData({
-              metering: status.metering || 0,
-              durationMillis: status.durationMillis,
-              isRecording: status.isRecording,
-              isDoneRecording: status.isDoneRecording,
-            });
-          }
-        }
-      });
-      console.log('设置状态监听器');
-
-      await newRecording.startAsync();
-      console.log('开始录音');
-      setRecording(newRecording);
-      setIsRecording(true);
-      if (onRecordingState) {
-        onRecordingState(true);
-      }
-    } catch (error) {
-      console.error('录音失败:', error);
+    if (isWeb) {
+      await startWebRecording();
+    } else {
+      // 原有的移动端录音逻辑
+      // ...
     }
   };
 
-  // 停止录音
+  // 修改停止录音函数
   const stopRecording = async () => {
-    if (!recording) return;
-
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
-      setIsRecording(false);
-      if (onRecordingState) {
-        onRecordingState(false);
-      }
-
-      // TODO: 发送录音文件到 Native Bridge 处理
-      // const result = await MeowTalkBridge.processAudioFile(uri);
-      // if (result && onEmotionDetected) {
-      //   setEmotionResult(result);
-      //   onEmotionDetected(result);
-      // }
-    } catch (error) {
-      console.error('Failed to stop recording', error);
+    if (isWeb) {
+      stopWebRecording();
+    } else {
+      // 原有的移动端录音逻辑
+      // ...
     }
   };
+
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      if (isRecording) {
+        audioRecorderPlayer.stopRecorder();
+        audioRecorderPlayer.removeRecordBackListener();
+      }
+    };
+  }, [isRecording, audioRecorderPlayer]);
+
+  // 在组件顶层添加新的 useEffect
+  useEffect(() => {
+    let frameId: number;
+    let isActive = true; // 添加一个标志来控制动画循环
+    
+    if (isRecording && analyser) {
+      const startTime = Date.now();
+      const doMonitor = () => {
+        if (!isActive) return; // 如果不再活跃，停止循环
+        
+        monitorVolume(startTime);
+        frameId = requestAnimationFrame(doMonitor);
+      };
+      doMonitor();
+    }
+
+    return () => {
+      isActive = false; // 标记为非活跃
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [isRecording, analyser]);
 
   return (
     <View style={styles.container}>

@@ -21,14 +21,15 @@ const TestAudioPage: React.FC = () => {
 
   // 处理录音数据
   const handleAudioData = (data: any) => {
-    console.log('收到音频数据:', data);
     setAudioData(data);
-    addLog(`音频状态: ${JSON.stringify({
-      音量: data.metering?.toFixed(2) || 0,
-      时长: data.durationMillis + 'ms',
-      录制中: data.isRecording,
-      已完成: data.isDoneRecording
-    }, null, 2)}`);
+    if (data.isRecording) {
+      // 只在录音过程中添加音量日志
+      addLog(`音频状态: {
+        音量: ${(data.metering || 0).toFixed(2)},
+        时长: ${data.durationMillis}ms,
+        录制中: ${data.isRecording}
+      }`);
+    }
   };
 
   // 处理录音状态变化
@@ -48,6 +49,7 @@ const TestAudioPage: React.FC = () => {
         <AudioRecorder
           onAudioData={handleAudioData}
           onRecordingState={handleRecordingStateChange}
+          onLog={addLog}
         />
 
         <View style={styles.dataDisplay}>
