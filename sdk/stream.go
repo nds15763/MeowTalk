@@ -106,20 +106,21 @@ func StartAudioStream(streamId string) error {
 		FeatureExtractor: NewFeatureExtractor(sdk.Config.SampleRate),
 		Buffer:           make([]float64, 0),
 		Active:           true,
+		ResultChan:       make(chan []byte, 10), // 添加结果通道
 	}
 
 	sdk.Sessions[streamId] = session
 	return nil
 }
 
-// SendAudioChunk 发送音频数据块并返回处理结果
-func SendAudioChunk(streamId string, chunk []byte) ([]byte, error) {
+// SendAudioChunk 发送音频数据块
+func SendAudioChunk(streamId string, chunk []byte) error {
 	mu.RLock()
 	session, exists := sdk.Sessions[streamId]
 	mu.RUnlock()
 
 	if !exists {
-		return nil, fmt.Errorf("session not found")
+		return fmt.Errorf("session not found")
 	}
 
 	// 转换音频数据为float64
@@ -134,10 +135,37 @@ func SendAudioChunk(streamId string, chunk []byte) ([]byte, error) {
 
 	// 当缓冲区达到处理窗口大小时进行处理
 	if len(session.Buffer) >= sdk.Config.BufferSize {
-		return processBuffer(session)
+		go func() {
+			result, err := processBuffer(session)
+			if err == nil && result != nil {
+				select {
+				case session.ResultChan <- result:
+				default:
+					// 通道已满，丢弃结果
+				}
+			}
+		}()
 	}
 
-	return nil, nil
+	return nil
+}
+
+// RecvMessage 接收处理结果
+func RecvMessage(streamId string) ([]byte, error) {
+	mu.RLock()
+	session, exists := sdk.Sessions[streamId]
+	mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("session not found")
+	}
+
+	select {
+	case result := <-session.ResultChan:
+		return result, nil
+	default:
+		return nil, nil
+	}
 }
 
 // processBuffer 处理音频缓冲区并返回结果

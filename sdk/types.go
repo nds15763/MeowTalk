@@ -71,11 +71,12 @@ type AudioStreamMeta struct {
 
 // AudioStreamSession 音频流会话
 type AudioStreamSession struct {
-	ID               string
-	FeatureExtractor *FeatureExtractor
-	Buffer           []float64
-	Callback         func([]byte)
-	Active           bool
+	ID               string            // 会话ID
+	FeatureExtractor *FeatureExtractor // 特征提取器
+	Buffer           []float64         // 音频缓冲区
+	Callback         func([]byte)      // 回调函数
+	Active           bool              // 会话是否活跃
+	ResultChan       chan []byte       // 结果通道
 }
 
 // MeowTalkSDK SDK实例

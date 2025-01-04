@@ -84,41 +84,20 @@ func StartStream(streamId *C.char) C.ErrorCode {
 }
 
 //export SendAudio
-func SendAudio(streamId *C.char, data *C.uchar, length C.int) *C.EmotionResult {
-	if streamId == nil || data == nil || length <= 0 {
-		return nil
-	}
-
+func SendAudio(streamId *C.char, data *C.uchar, length C.int) C.bool {
 	id := C.GoString(streamId)
-	audioData := C.GoBytes(unsafe.Pointer(data), length)
+	err := SendAudioChunk(id, C.GoBytes(unsafe.Pointer(data), length))
+	return C.bool(err == nil)
+}
 
-	// 处理音频数据
-	result, err := SendAudioChunk(id, audioData)
-	if err != nil {
+//export RecvMessage
+func RecvMessage(streamId *C.char) *C.char {
+	id := C.GoString(streamId)
+	result, err := RecvMessage(id)
+	if err != nil || result == nil {
 		return nil
 	}
-
-	// 解析JSON结果
-	var streamResult AudioStreamResult
-	if err := json.Unmarshal(result, &streamResult); err != nil {
-		return nil
-	}
-
-	// 从对象池获取C结构
-	cResult := resultPool.Get().(*C.EmotionResult)
-
-	// 转换结果
-	cResult.emotion = C.CString(streamResult.Emotion)
-	cResult.confidence = C.double(streamResult.Confidence)
-	cResult.timestamp = C.int64_t(streamResult.Timestamp)
-
-	// 设置终结器
-	runtime.SetFinalizer(cResult, func(r *C.EmotionResult) {
-		C.freeEmotionResult(r)
-		resultPool.Put(r)
-	})
-
-	return cResult
+	return C.CString(string(result))
 }
 
 //export StopStream
