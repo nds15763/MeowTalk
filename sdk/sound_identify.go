@@ -101,7 +101,9 @@ func (fe *FeatureExtractor) splitFrames(samples []float64) [][]float64 {
 		if end > len(samples) {
 			end = len(samples)
 		}
-		frames[i] = samples[start:end]
+		frame := make([]float64, end-start)
+		copy(frame, samples[start:end])
+		frames[i] = frame
 	}
 
 	return frames
@@ -109,18 +111,23 @@ func (fe *FeatureExtractor) splitFrames(samples []float64) [][]float64 {
 
 // calculateZeroCrossRate 计算过零率
 func (fe *FeatureExtractor) calculateZeroCrossRate(samples []float64) float64 {
+	if len(samples) < 2 {
+		return 0
+	}
+
 	crossings := 0
 	for i := 1; i < len(samples); i++ {
 		if (samples[i-1] >= 0 && samples[i] < 0) || (samples[i-1] < 0 && samples[i] >= 0) {
 			crossings++
 		}
 	}
-	return float64(crossings) / float64(len(samples))
+
+	return float64(crossings) / float64(len(samples)-1)
 }
 
 // calculateEnergy 计算能量
 func (fe *FeatureExtractor) calculateEnergy(samples []float64) float64 {
-	var energy float64
+	energy := 0.0
 	for _, sample := range samples {
 		energy += sample * sample
 	}
@@ -129,63 +136,99 @@ func (fe *FeatureExtractor) calculateEnergy(samples []float64) float64 {
 
 // estimatePitch 估计基音频率
 func (fe *FeatureExtractor) estimatePitch(samples []float64) float64 {
-	minLag := fe.sampleRate / 1000 // 1000 Hz
-	maxLag := fe.sampleRate / 50   // 50 Hz
+	if len(samples) < fe.frameSize {
+		return 0
+	}
 
-	var maxCorr float64
-	var bestLag int
+	// 使用自相关法估计基频
+	minLag := fe.sampleRate / 2000 // 最高2000Hz
+	maxLag := fe.sampleRate / 70   // 最低70Hz
+	maxCorr := 0.0
+	bestLag := 0
 
+	// 计算自相关
 	for lag := minLag; lag <= maxLag; lag++ {
-		var corr float64
+		corr := 0.0
 		for i := 0; i < len(samples)-lag; i++ {
 			corr += samples[i] * samples[i+lag]
 		}
+		corr = corr / float64(len(samples)-lag)
+
 		if corr > maxCorr {
 			maxCorr = corr
 			bestLag = lag
 		}
 	}
 
-	if bestLag == 0 {
-		return 0
+	if bestLag > 0 {
+		return float64(fe.sampleRate) / float64(bestLag)
 	}
-	return float64(fe.sampleRate) / float64(bestLag)
+	return 0
 }
 
 // calculatePeakFrequency 计算峰值频率
 func (fe *FeatureExtractor) calculatePeakFrequency(samples []float64) float64 {
-	// 简单FFT实现
-	n := len(samples)
-	fft := make([]complex128, n)
-	for i, sample := range samples {
-		fft[i] = complex(sample, 0)
+	if len(samples) < fe.frameSize {
+		return 0
 	}
 
-	// Cooley-Tukey FFT
-	for step := 2; step <= n; step *= 2 {
-		for i := 0; i < n; i += step {
-			for j := i; j < i+step/2; j++ {
-				t := cmplxFromAngle(-2 * math.Pi * float64(j-i) / float64(step))
-				t = cmplxMul(t, fft[j+step/2])
-
-				fft[j+step/2] = cmplxSub(fft[j], t)
-				fft[j] = cmplxAdd(fft[j], t)
-			}
-		}
+	// 应用汉明窗
+	windowed := make([]float64, fe.frameSize)
+	for i := 0; i < fe.frameSize; i++ {
+		// 汉明窗函数
+		window := 0.54 - 0.46*math.Cos(2*math.Pi*float64(i)/float64(fe.frameSize-1))
+		windowed[i] = samples[i] * window
 	}
 
-	// 找出幅度最大的频率
+	// 执行FFT
+	fft := make([]complex128, fe.frameSize)
+	for i := 0; i < fe.frameSize; i++ {
+		fft[i] = complex(windowed[i], 0)
+	}
+	fft = fe.fft(fft)
+
+	// 寻找峰值频率
 	maxMagnitude := 0.0
-	peakIndex := 0
-	for i := 0; i < n/2; i++ {
+	peakBin := 0
+	for i := 0; i < fe.frameSize/2; i++ {
 		magnitude := cmplxAbs(fft[i])
 		if magnitude > maxMagnitude {
 			maxMagnitude = magnitude
-			peakIndex = i
+			peakBin = i
 		}
 	}
 
-	return float64(peakIndex) * float64(fe.sampleRate) / float64(n)
+	// 转换为频率
+	return float64(peakBin) * float64(fe.sampleRate) / float64(fe.frameSize)
+}
+
+// fft 快速傅里叶变换
+func (fe *FeatureExtractor) fft(x []complex128) []complex128 {
+	N := len(x)
+	if N <= 1 {
+		return x
+	}
+
+	even := make([]complex128, N/2)
+	odd := make([]complex128, N/2)
+	for i := 0; i < N/2; i++ {
+		even[i] = x[2*i]
+		odd[i] = x[2*i+1]
+	}
+
+	even = fe.fft(even)
+	odd = fe.fft(odd)
+
+	factor := -2 * math.Pi / float64(N)
+	result := make([]complex128, N)
+	for k := 0; k < N/2; k++ {
+		phase := factor * float64(k)
+		t := cmplxMul(cmplxFromAngle(phase), odd[k])
+		result[k] = cmplxAdd(even[k], t)
+		result[k+N/2] = cmplxSub(even[k], t)
+	}
+
+	return result
 }
 
 // 复数运算辅助函数

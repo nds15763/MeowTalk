@@ -46,7 +46,7 @@ type SampleProcessor struct {
 	FrameLength float64        // 帧长（毫秒）
 }
 
-//---------------Stream SDK---------------
+// ---------------Stream SDK---------------
 // AudioStreamConfig SDK配置
 type AudioStreamConfig struct {
 	ModelPath  string `json:"model"`
@@ -65,8 +65,8 @@ type AudioStreamResult struct {
 
 // AudioStreamMeta 元数据
 type AudioStreamMeta struct {
-	AudioLength    int    `json:"audioLength"`
-	AdditionalInfo string `json:"additionalInfo"`
+	AudioLength int                `json:"audioLength"`
+	Features    map[string]float64 `json:"features"`
 }
 
 // AudioStreamSession 音频流会话
@@ -83,4 +83,19 @@ type MeowTalkSDK struct {
 	Config    AudioStreamConfig
 	Sessions  map[string]*AudioStreamSession
 	Processor *SampleProcessor
+}
+
+// MapToAudioFeature 将特征映射转换为AudioFeature结构
+func MapToAudioFeature(features map[string]float64) AudioFeature {
+	return AudioFeature{
+		ZeroCrossRate:    features["ZeroCrossRate"],
+		Energy:           features["Energy"],
+		Pitch:            features["Pitch"],
+		Duration:         features["Duration"],
+		PeakFreq:         features["PeakFreq"],
+		RootMeanSquare:   features["RootMeanSquare"],
+		SpectralCentroid: features["SpectralCentroid"],
+		SpectralRolloff:  features["SpectralRolloff"],
+		FundamentalFreq:  features["FundamentalFreq"],
+	}
 }

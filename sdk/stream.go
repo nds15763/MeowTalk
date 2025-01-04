@@ -1,3 +1,32 @@
+/*
+Package main 实现了 MeowTalk 的核心音频流处理功能。
+
+SDK 内部流程
+应用端 ─────────────────────────────────────────────> 应用端
+        │                                           ↑
+        │ SendAudio                                │
+        │                                          │
+        ↓                                          │
+    音频数据 -> 特征提取 -> 情感分类 -> JSON结果 ────┘
+
+主要功能：
+1. 音频流管理：创建、处理和销毁音频流会话
+2. 特征提取：从音频数据中提取关键特征
+3. 情感分类：基于预训练模型进行实时情感识别
+
+处理流程：
+1. 接收PCM格式的音频数据
+2. 缓冲并分帧处理
+3. 提取音频特征（频谱、能量等）
+4. 使用样本库进行情感匹配
+5. 直接返回识别结果
+
+注意事项：
+- 所有音频数据必须是16位PCM格式
+- 支持的采样率：8kHz-48kHz
+- 建议缓冲区大小：4096 samples
+*/
+
 package main
 
 import (
@@ -15,27 +44,54 @@ var (
 )
 
 // InitializeSDK 初始化SDK
-// @param config: AudioStreamConfig from types.go
 func InitializeSDK(config AudioStreamConfig) bool {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// 验证配置参数
+	if config.SampleRate <= 0 || config.BufferSize <= 0 {
+		fmt.Println("Error: Invalid audio configuration parameters")
+		return false
+	}
+
+	// 创建样本库
+	sampleLib := NewSampleLibrary()
+
+	// 加载样本库文件
+	err := sampleLib.LoadFromFile("sdk/sample_library.json")
+	if err != nil {
+		fmt.Printf("Failed to load sample library: %v\n", err)
+		return false
+	}
+
+	// 创建样本处理器
+	processor := &SampleProcessor{
+		Library:     sampleLib,
+		SampleRate:  config.SampleRate,
+		WindowSize:  config.BufferSize,
+		FFTSize:     2048, // 标准FFT大小
+		FrameLength: 20.0, // 20ms的帧长
+	}
+
+	// 初始化SDK实例
 	sdk = &MeowTalkSDK{
 		Config:    config,
 		Sessions:  make(map[string]*AudioStreamSession),
-		Processor: NewSampleProcessor(config),
+		Processor: processor,
 	}
 
-	// TODO: 加载模型
-	// 1. 从ModelPath加载预训练模型
-	// 2. 初始化特征提取器
-	// 3. 初始化情感分类器
+	// 验证初始化
+	if len(sdk.Processor.Library.Samples) == 0 {
+		fmt.Println("Warning: Sample library is empty")
+		return false
+	}
 
+	fmt.Printf("SDK initialized with sample rate: %d Hz, buffer size: %d\n",
+		config.SampleRate, config.BufferSize)
 	return true
 }
 
 // StartAudioStream 开始音频流会话
-// @param streamId: string - 会话唯一标识
 func StartAudioStream(streamId string) error {
 	mu.Lock()
 	defer mu.Unlock()
@@ -56,16 +112,14 @@ func StartAudioStream(streamId string) error {
 	return nil
 }
 
-// SendAudioChunk 发送音频数据块
-// @param streamId: string - 会话ID
-// @param chunk: []byte - 音频数据(PCM格式)
-func SendAudioChunk(streamId string, chunk []byte) error {
+// SendAudioChunk 发送音频数据块并返回处理结果
+func SendAudioChunk(streamId string, chunk []byte) ([]byte, error) {
 	mu.RLock()
 	session, exists := sdk.Sessions[streamId]
 	mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("session not found")
+		return nil, fmt.Errorf("session not found")
 	}
 
 	// 转换音频数据为float64
@@ -80,57 +134,43 @@ func SendAudioChunk(streamId string, chunk []byte) error {
 
 	// 当缓冲区达到处理窗口大小时进行处理
 	if len(session.Buffer) >= sdk.Config.BufferSize {
-		go processBuffer(session)
+		return processBuffer(session)
 	}
 
-	return nil
+	return nil, nil
 }
 
-// 处理音频缓冲区
-func processBuffer(session *AudioStreamSession) {
+// processBuffer 处理音频缓冲区并返回结果
+func processBuffer(session *AudioStreamSession) ([]byte, error) {
 	// 1. 提取特征
-	features := session.FeatureExtractor.Extract(&AudioData{
+	rawFeatures := session.FeatureExtractor.Extract(&AudioData{
 		Samples:    session.Buffer[:sdk.Config.BufferSize],
 		SampleRate: sdk.Config.SampleRate,
 	})
 
-	// 2. 情感分类
-	emotion, confidence := classifyEmotion(features)
+	// 2. 转换为AudioFeature结构
+	feature := MapToAudioFeature(rawFeatures)
 
-	// 3. 构造结果
+	// 3. 使用样本库进行匹配
+	emotion, confidence := sdk.Processor.Library.Match(feature)
+
+	// 4. 构造结果
 	result := AudioStreamResult{
 		StreamID:   session.ID,
 		Timestamp:  time.Now().Unix(),
 		Emotion:    emotion,
 		Confidence: confidence,
 		Metadata: AudioStreamMeta{
-			AudioLength:    sdk.Config.BufferSize,
-			AdditionalInfo: fmt.Sprintf("Features: %+v", features),
+			AudioLength: sdk.Config.BufferSize,
+			Features:    rawFeatures, // 保留原始特征用于调试
 		},
-	}
-
-	// 4. 发送结果
-	if session.Callback != nil {
-		jsonResult, _ := json.Marshal(result)
-		session.Callback(jsonResult)
 	}
 
 	// 5. 更新缓冲区（保留未处理的数据）
 	session.Buffer = session.Buffer[sdk.Config.BufferSize:]
-}
 
-// RegisterCallback 注册回调函数
-func RegisterCallback(streamId string, callback func([]byte)) error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	session, exists := sdk.Sessions[streamId]
-	if !exists {
-		return fmt.Errorf("session not found")
-	}
-
-	session.Callback = callback
-	return nil
+	// 6. 返回JSON结果
+	return json.Marshal(result)
 }
 
 // StopAudioStream 停止音频流会话
@@ -161,18 +201,3 @@ func ReleaseSDK() {
 		sdk = nil
 	}
 }
-
-// 情感分类（待实现）
-func classifyEmotion(features map[string]float64) (string, float64) {
-	// TODO: 实现情感分类逻辑
-	// 1. 使用预训练模型进行推理
-	// 2. 返回情感类型和置信度
-	return "happy", 0.92
-}
-
-// CGO导出接口（待实现）
-//export InitSDK
-//export StartStream
-//export SendAudio
-//export StopStream
-//export ReleaseSDK
