@@ -1,5 +1,7 @@
 package main
 
+import "errors"
+
 // AudioFeature 存储提取的特征
 type AudioFeature struct {
 	// 时域特征
@@ -85,6 +87,24 @@ type MeowTalkSDK struct {
 	Sessions  map[string]*AudioStreamSession
 	Processor *SampleProcessor
 }
+
+// 错误定义
+var (
+	ErrEmptyData         = errors.New("empty audio data")
+	ErrInvalidDataLength = errors.New("invalid audio data length")
+	ErrSampleOutOfRange  = errors.New("sample value out of range")
+	ErrBufferOverflow    = errors.New("buffer overflow")
+	ErrInvalidSampleRate = errors.New("invalid sample rate")
+)
+
+// 音频相关常量
+const (
+	MinSampleRate   = 8000
+	MaxSampleRate   = 48000
+	MaxSampleValue  = 32767
+	MinSampleValue  = -32768
+	MaxBufferSize   = 1024 * 1024 // 1MB
+)
 
 // MapToAudioFeature 将特征映射转换为AudioFeature结构
 func MapToAudioFeature(features map[string]float64) AudioFeature {

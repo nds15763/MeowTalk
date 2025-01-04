@@ -49,8 +49,13 @@ func InitializeSDK(config AudioStreamConfig) bool {
 	defer mu.Unlock()
 
 	// 验证配置参数
-	if config.SampleRate <= 0 || config.BufferSize <= 0 {
-		fmt.Println("Error: Invalid audio configuration parameters")
+	if config.SampleRate < MinSampleRate || config.SampleRate > MaxSampleRate {
+		fmt.Println("Error: Invalid sample rate")
+		return false
+	}
+
+	if config.BufferSize <= 0 {
+		fmt.Println("Error: Invalid buffer size")
 		return false
 	}
 
@@ -123,17 +128,33 @@ func SendAudioChunk(streamId string, chunk []byte) error {
 		return fmt.Errorf("session not found")
 	}
 
-	// 转换音频数据为float64
-	samples := make([]float64, len(chunk)/2)
-	for i := 0; i < len(samples); i++ {
-		sample := float64(int16(binary.LittleEndian.Uint16(chunk[i*2 : (i+1)*2])))
-		samples[i] = sample / 32768.0
+	// 1. 检查数据有效性
+	if len(chunk) == 0 {
+		return ErrEmptyData
+	}
+	if len(chunk)%2 != 0 {
+		return ErrInvalidDataLength
 	}
 
-	// 添加到缓冲区
+	// 2. 转换音频数据为float64并检查范围
+	samples := make([]float64, len(chunk)/2)
+	for i := 0; i < len(samples); i++ {
+		sample := int16(binary.LittleEndian.Uint16(chunk[i*2 : (i+1)*2]))
+		if sample > MaxSampleValue || sample < MinSampleValue {
+			return ErrSampleOutOfRange
+		}
+		samples[i] = float64(sample) / 32768.0
+	}
+
+	// 3. 检查缓冲区溢出
+	if len(session.Buffer)+len(samples) > MaxBufferSize {
+		return ErrBufferOverflow
+	}
+
+	// 4. 添加到缓冲区
 	session.Buffer = append(session.Buffer, samples...)
 
-	// 当缓冲区达到处理窗口大小时进行处理
+	// 5. 当缓冲区达到处理窗口大小时进行处理
 	if len(session.Buffer) >= sdk.Config.BufferSize {
 		go func() {
 			result, err := processBuffer(session)
