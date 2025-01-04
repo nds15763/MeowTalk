@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, PermissionsAndroid } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, PermissionsAndroid, NativeModules, NativeEventEmitter } from 'react-native';
 import AudioRecorderPlayer, {
   AVEncoderAudioQualityIOSType,
   AVEncodingOption,
@@ -44,16 +44,21 @@ interface AudioRecorderProps {
 // 在文件顶部添加 Web 平台检测
 const isWeb = Platform.OS === 'web';
 
+// 在文件顶部添加 SDK 引入
+const { MeowTalkSDK } = NativeModules;
+const sdkEvents = new NativeEventEmitter(MeowTalkSDK);
+
 export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecordingState, onLog }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [currentVolume, setCurrentVolume] = useState(0);
   const [emotionResult, setEmotionResult] = useState<EmotionResult | null>(null);
   const [audioRecorderPlayer] = useState(new AudioRecorderPlayer());
-  const [recordingPath, setRecordingPath] = useState<string>('');
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const timestamp = (new Date()).valueOf();
+  const [streamId] = useState(`stream_${timestamp}`);
 
   // 将 monitorVolume 移到组件顶层
   const monitorVolume = useCallback((startTime: number) => {
@@ -228,8 +233,13 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
     if (isWeb) {
       await startWebRecording();
     } else {
-      // 原有的移动端录音逻辑
-      // ...
+      try {
+        await MeowTalkSDK.startAudioStream(streamId);
+        // 保留原有录音逻辑...
+      } catch (err: any) {
+        onLog?.(`Failed to start audio stream: ${err.message}`);
+        console.error('Failed to start audio stream:', err);
+      }
     }
   };
 
@@ -238,8 +248,13 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
     if (isWeb) {
       stopWebRecording();
     } else {
-      // 原有的移动端录音逻辑
-      // ...
+      try {
+        await MeowTalkSDK.stopAudioStream(streamId);
+        // 保留原有停止录音逻辑...
+      } catch (err: any) {
+        onLog?.(`Failed to stop audio stream: ${err.message}`);
+        console.error('Failed to stop audio stream:', err);
+      }
     }
   };
 
@@ -279,6 +294,36 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
       }
     };
   }, [isRecording, analyser, monitorVolume]);
+
+  // 在 useEffect 中初始化 SDK
+  useEffect(() => {
+    // 初始化 SDK
+    MeowTalkSDK.initializeSDK({ model: 'default' })
+      .then(() => {
+        onLog?.('SDK initialized');
+        
+        // 注册结果回调
+        const subscription = sdkEvents.addListener('onResult', (result) => {
+          onLog?.(`收到分析结果: ${JSON.stringify(result)}`);
+          if(result.emotion) {
+            onEmotionDetected?.({
+              emotion: result.emotion,
+              confidence: result.confidence,
+              features: result.metadata
+            });
+          }
+        });
+
+        return () => {
+          subscription.remove();
+          MeowTalkSDK.releaseSDK();
+        };
+      })
+      .catch((err: any) => {
+        onLog?.(`SDK init failed: ${err.message}`);
+        console.error('SDK init failed:', err);
+      });
+  }, []);
 
   return (
     <View style={styles.container}>

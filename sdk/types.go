@@ -45,3 +45,42 @@ type SampleProcessor struct {
 	FFTSize     int            // FFT大小
 	FrameLength float64        // 帧长（毫秒）
 }
+
+//---------------Stream SDK---------------
+// AudioStreamConfig SDK配置
+type AudioStreamConfig struct {
+	ModelPath  string `json:"model"`
+	SampleRate int    `json:"sampleRate"`
+	BufferSize int    `json:"bufferSize"`
+}
+
+// AudioStreamResult 实时识别结果
+type AudioStreamResult struct {
+	StreamID   string          `json:"streamId"`
+	Timestamp  int64           `json:"timestamp"`
+	Emotion    string          `json:"emotion"`
+	Confidence float64         `json:"confidence"`
+	Metadata   AudioStreamMeta `json:"metadata"`
+}
+
+// AudioStreamMeta 元数据
+type AudioStreamMeta struct {
+	AudioLength    int    `json:"audioLength"`
+	AdditionalInfo string `json:"additionalInfo"`
+}
+
+// AudioStreamSession 音频流会话
+type AudioStreamSession struct {
+	ID               string
+	FeatureExtractor *FeatureExtractor
+	Buffer           []float64
+	Callback         func([]byte)
+	Active           bool
+}
+
+// MeowTalkSDK SDK实例
+type MeowTalkSDK struct {
+	Config    AudioStreamConfig
+	Sessions  map[string]*AudioStreamSession
+	Processor *SampleProcessor
+}

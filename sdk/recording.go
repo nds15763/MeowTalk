@@ -13,16 +13,26 @@ import (
 )
 
 // NewSampleProcessor 创建新的样本处理器实例
-func NewSampleProcessor() *SampleProcessor {
+func NewSampleProcessor(config AudioStreamConfig) *SampleProcessor {
 	return &SampleProcessor{
 		Library: &SampleLibrary{
 			Samples:    make(map[string][]AudioSample),
 			Statistics: make(map[string]EmotionStatistics),
 		},
-		SampleRate:  44100, // 默认采样率
-		WindowSize:  1024,  // 默认窗口大小
-		FFTSize:     2048,  // 默认FFT大小
-		FrameLength: 25.0,  // 默认帧长（毫秒）
+		SampleRate: func() int {
+			if config.SampleRate == 0 {
+				return 44100
+			}
+			return config.SampleRate
+		}(), // 默认采样率
+		WindowSize: func() int {
+			if config.BufferSize == 0 {
+				return 1024
+			}
+			return config.BufferSize
+		}(), // 默认窗口大小
+		FFTSize:     2048, // 默认FFT大小
+		FrameLength: 25.0, // 默认帧长（毫秒）
 	}
 }
 
@@ -358,8 +368,8 @@ func (p *SampleProcessor) calculateStatistics() {
 		}
 
 		stats := EmotionStatistics{
-			SampleCount: len(samples),
-			MeanFeature: AudioFeature{},
+			SampleCount:   len(samples),
+			MeanFeature:   AudioFeature{},
 			StdDevFeature: AudioFeature{},
 		}
 
@@ -534,7 +544,11 @@ func (p *SampleProcessor) ExportLibrary(outputPath string) error {
 
 func main() {
 	// 创建样本处理器
-	processor := NewSampleProcessor()
+	processor := NewSampleProcessor(AudioStreamConfig{
+		ModelPath:  "./model",
+		SampleRate: 44100,
+		BufferSize: 1024,
+	})
 
 	// 设置输入目录和输出文件
 	inputDir := "./emotion_samples"
