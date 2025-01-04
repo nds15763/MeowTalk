@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
   StyleSheet,
@@ -13,22 +13,31 @@ const TestAudioPage: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [audioData, setAudioData] = useState<any>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const lastLogTime = useRef<number>(0);
 
   // 添加日志
   const addLog = (message: string) => {
-    setLogs(prev => [`[${new Date().toISOString()}] ${message}`, ...prev]);
+    if (!isRecording) return;
+    // 限制日志数量，只保留最近的 50 条
+    setLogs(prev => {
+      const newLogs = [`[${new Date().toISOString()}] ${message}`, ...prev];
+      return newLogs.slice(0, 50); // 只保留最近的 50 条日志
+    });
   };
 
   // 处理录音数据
   const handleAudioData = (data: any) => {
+    // 先判断录音状态，如果不在录音就直接返回
+    if (!isRecording) return;
+
     setAudioData(data);
-    if (data.isRecording) {
-      // 只在录音过程中添加音量日志
-      addLog(`音频状态: {
-        音量: ${(data.metering || 0).toFixed(2)},
-        时长: ${data.durationMillis}ms,
-        录制中: ${data.isRecording}
-      }`);
+    // 只在音量变化显著时才记录日志
+    if (data.metering !== undefined) {
+      const now = Date.now();
+      if (!lastLogTime.current || now - lastLogTime.current >= 500) {
+        addLog(`音频状态: 音量=${(data.metering || 0).toFixed(2)}, 时长=${data.durationMillis}ms`);
+        lastLogTime.current = now;
+      }
     }
   };
 
@@ -36,8 +45,30 @@ const TestAudioPage: React.FC = () => {
   const handleRecordingStateChange = (recording: boolean) => {
     console.log('录音状态变化:', recording);
     setIsRecording(recording);
-    addLog(`录音状态: ${recording ? '开始' : '停止'}`);
+    
+    if (!recording) {
+      // 在录音停止时清除音频数据
+      setAudioData(null);
+      addLog('录音已停止');
+    } else {
+      addLog('录音已开始');
+    }
   };
+
+  // 在录音状态改变时清理
+  useEffect(() => {
+    if (!isRecording) {
+      setAudioData(null);
+    }
+  }, [isRecording]);
+
+  // 在组件卸载时清理日志
+  useEffect(() => {
+    return () => {
+      setLogs([]);
+      lastLogTime.current = 0;
+    };
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,11 +85,11 @@ const TestAudioPage: React.FC = () => {
 
         <View style={styles.dataDisplay}>
           <Text style={styles.subtitle}>音频数据信息:</Text>
-          {audioData && (
+          {audioData && isRecording && (
             <Text>
               音量: {audioData.metering?.toFixed(2) || 0}{'\n'}
               录音时长: {audioData.durationMillis}ms{'\n'}
-              录制状态: {audioData.isRecording ? '录制中' : '已停止'}{'\n'}
+              录制状态: {isRecording ? '录制中' : '已停止'}{'\n'}
               完成状态: {audioData.isDoneRecording ? '已完成' : '未完成'}
             </Text>
           )}

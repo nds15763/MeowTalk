@@ -57,42 +57,27 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
 
   // 将 monitorVolume 移到组件顶层
   const monitorVolume = useCallback((startTime: number) => {
-    console.log('monitorVolume 被调用，初始状态:', {
+    if (!isRecording || !analyser) {
+      console.log('停止音量监控:', { isRecording, hasAnalyser: !!analyser });
+      return;
+    }
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(dataArray);
+    
+    const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
+    const volume = average / 255;
+    
+    setCurrentVolume(volume);
+    onAudioData?.({
+      metering: volume,
       isRecording,
-      hasAnalyser: !!analyser,
-      analyserState: analyser ? 'active' : 'null'
+      durationMillis: Date.now() - startTime,
+      isDoneRecording: false
     });
 
-    if (analyser && isRecording) {
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(dataArray);
-      
-      const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
-      const volume = average / 255;
-      
-      console.log('音频数据:', {
-        frequencyBinCount: analyser.frequencyBinCount,
-        average,
-        volume,
-        dataArrayLength: dataArray.length,
-        someValues: dataArray.slice(0, 5)
-      });
-      
-      setCurrentVolume(volume);
-      onAudioData?.({
-        metering: volume,
-        isRecording: true,
-        durationMillis: Date.now() - startTime,
-        isDoneRecording: false
-      });
-
+    if (isRecording) {
       requestAnimationFrame(() => monitorVolume(startTime));
-    } else {
-      console.log('monitorVolume 条件检查失败:', {
-        isRecording,
-        hasAnalyser: !!analyser,
-        analyserState: analyser ? 'active' : 'null'
-      });
     }
   }, [isRecording, analyser, onAudioData]);
 
@@ -174,7 +159,6 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
 
       recorder.onstop = () => {
         console.log('录音停止事件触发');
-        onRecordingState?.(false);
         onLog?.('Web 录音停止');
         
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
@@ -203,39 +187,38 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
   };
 
   const stopWebRecording = () => {
-    console.log('停止录音，当前状态:', { isRecording, hasMediaRecorder: !!mediaRecorder });
-    
     if (mediaRecorder && isRecording) {
       try {
-        // 1. 首先更新状态
-        setIsRecording(false);
-        
-        // 2. 停止所有音频轨道
-        mediaRecorder.stream.getTracks().forEach(track => {
-          console.log('停止音频轨道:', track.kind);
+        // 1. 先停止所有音轨
+        const tracks = mediaRecorder.stream.getTracks();
+        tracks.forEach(track => {
           track.stop();
+          console.log(`音轨 ${track.kind} 已停止`);
         });
-        
-        // 3. 停止 MediaRecorder
+
+        // 2. 停止 MediaRecorder
         mediaRecorder.stop();
         
-        // 4. 清理音频上下文
+        // 3. 清理音频上下文
         if (audioContext) {
           audioContext.close().then(() => {
             console.log('音频上下文已关闭');
-          }).catch(err => {
-            console.error('关闭音频上下文失败:', err);
           });
         }
-        
-        // 5. 重置所有状态
+
+        // 4. 重置所有状态
         setAudioContext(null);
         setAnalyser(null);
         setMediaRecorder(null);
+        setIsRecording(false); // 确保在这里更新录音状态
+        onRecordingState?.(false); // 通知父组件录音已停止
         
         console.log('所有音频资源已清理');
       } catch (error) {
         console.error('停止录音时出错:', error);
+        // 即使出错也要确保状态被重置
+        setIsRecording(false);
+        onRecordingState?.(false);
       }
     }
   };
@@ -273,26 +256,29 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
   // 在组件顶层添加新的 useEffect
   useEffect(() => {
     let frameId: number;
-    let isActive = true; // 添加一个标志来控制动画循环
-    
+
     if (isRecording && analyser) {
       const startTime = Date.now();
+      console.log('开始音频监控:', { isRecording, hasAnalyser: !!analyser });
+      
       const doMonitor = () => {
-        if (!isActive) return; // 如果不再活跃，停止循环
-        
+        if (!isRecording) {
+          console.log('停止音频监控');
+          return;
+        }
         monitorVolume(startTime);
         frameId = requestAnimationFrame(doMonitor);
       };
+      
       doMonitor();
     }
 
     return () => {
-      isActive = false; // 标记为非活跃
       if (frameId) {
         cancelAnimationFrame(frameId);
       }
     };
-  }, [isRecording, analyser]);
+  }, [isRecording, analyser, monitorVolume]);
 
   return (
     <View style={styles.container}>

@@ -81,37 +81,93 @@ const startRecording = async () => {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const recorder = new MediaRecorder(stream);
   
+  // 设置录音状态和通知父组件
+  recorder.onstart = () => {
+    setIsRecording(true);
+    onRecordingState?.(true);
+  };
+  
   recorder.ondataavailable = (event) => {
     if (event.data.size > 0) {
       audioChunks.push(event.data);
     }
   };
   
-  recorder.start(100); // 每100ms触发一次ondataavailable
+  recorder.start(100);
 };
 ```
 
 ### 4.2 停止录音
 ```typescript
 const stopRecording = () => {
-  // 1. 停止 MediaRecorder
-  mediaRecorder?.stop();
-  
-  // 2. 停止所有音频轨道
-  mediaRecorder?.stream.getTracks().forEach(track => track.stop());
-  
-  // 3. 关闭音频上下文
-  audioContext?.close();
-  
-  // 4. 清理状态
-  setIsRecording(false);
-  setMediaRecorder(null);
-  setAudioContext(null);
-  setAnalyser(null);
+  if (!mediaRecorder || !isRecording) return;
+
+  try {
+    // 1. 停止所有音轨
+    mediaRecorder.stream.getTracks().forEach(track => {
+      track.stop();
+    });
+
+    // 2. 停止 MediaRecorder
+    mediaRecorder.stop();
+    
+    // 3. 关闭音频上下文
+    audioContext?.close();
+    
+    // 4. 更新状态和通知父组件
+    setIsRecording(false);
+    onRecordingState?.(false);
+    
+    // 5. 清理资源
+    setAudioContext(null);
+    setAnalyser(null);
+    setMediaRecorder(null);
+  } catch (error) {
+    console.error('停止录音时出错:', error);
+    // 确保状态重置和通知父组件
+    setIsRecording(false);
+    onRecordingState?.(false);
+  }
 };
 ```
 
-## 5. 资源清理顺序
+## 5. 状态管理
+
+### 5.1 组件状态同步
+```typescript
+// 子组件 (AudioRecorder)
+const [isRecording, setIsRecording] = useState(false);
+
+// 父组件 (TestAudioPage)
+const [isRecording, setIsRecording] = useState(false);
+const handleRecordingStateChange = (recording: boolean) => {
+  setIsRecording(recording);
+  if (!recording) {
+    setAudioData(null);
+  }
+};
+```
+
+### 5.2 音频数据同步
+```typescript
+// 子组件发送数据
+onAudioData?.({
+  metering: volume,
+  isRecording: true,
+  durationMillis: Date.now() - startTime,
+  isDoneRecording: false
+});
+
+// 父组件接收数据
+const handleAudioData = (data: any) => {
+  if (isRecording) {
+    setAudioData(data);
+    // 处理音频数据...
+  }
+};
+```
+
+## 6. 资源清理顺序
 
 1. 停止录音时的清理顺序：
    - 更新录音状态 (`setIsRecording(false)`)
@@ -134,7 +190,7 @@ const stopRecording = () => {
    }, []);
    ```
 
-## 6. 错误处理
+## 7. 错误处理
 
 ```typescript
 try {
@@ -148,9 +204,9 @@ try {
 }
 ```
 
-## 7. 调试信息
+## 8. 调试信息
 
-### 7.1 音频状态日志
+### 8.1 音频状态日志
 ```typescript
 console.log('音频状态:', {
   isRecording,
@@ -161,7 +217,7 @@ console.log('音频状态:', {
 });
 ```
 
-### 7.2 音频数据日志
+### 8.2 音频数据日志
 ```typescript
 console.log('音频数据:', {
   volume,
@@ -171,7 +227,7 @@ console.log('音频数据:', {
 });
 ```
 
-## 8. 注意事项
+## 9. 注意事项
 
 1. **资源管理**
    - 确保在组件卸载时清理所有资源
@@ -192,7 +248,7 @@ console.log('音频数据:', {
    - 处理权限请求失败
    - 提供降级方案
 
-## 9. 常见问题
+## 10. 常见问题
 
 1. **音频流未正确关闭**
    - 检查清理顺序
