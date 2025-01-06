@@ -542,31 +542,31 @@ func (p *SampleProcessor) ExportLibrary(outputPath string) error {
 	return nil
 }
 
-func main() {
-	// 创建样本处理器
-	processor := NewSampleProcessor(AudioStreamConfig{
-		ModelPath:  "./model",
-		SampleRate: 44100,
-		BufferSize: 1024,
-	})
+// func main() {
+// 	// 创建样本处理器
+// 	processor := NewSampleProcessor(AudioStreamConfig{
+// 		ModelPath:  "./model",
+// 		SampleRate: 44100,
+// 		BufferSize: 1024,
+// 	})
 
-	// 设置输入目录和输出文件
-	inputDir := "./emotion_samples"
-	outputFile := "sample_library.json"
+// 	// 设置输入目录和输出文件
+// 	inputDir := "./emotion_samples"
+// 	outputFile := "sample_library.json"
 
-	// 处理音频文件
-	fmt.Printf("开始处理目录: %s\n", inputDir)
-	if err := processor.ProcessDirectory(inputDir); err != nil {
-		fmt.Printf("处理样本失败: %v\n", err)
-		return
-	}
+// 	// 处理音频文件
+// 	fmt.Printf("开始处理目录: %s\n", inputDir)
+// 	if err := processor.ProcessDirectory(inputDir); err != nil {
+// 		fmt.Printf("处理样本失败: %v\n", err)
+// 		return
+// 	}
 
-	// 导出样本库
-	fmt.Printf("导出样本库到: %s\n", outputFile)
-	if err := processor.ExportLibrary(outputFile); err != nil {
-		fmt.Printf("导出样本库失败: %v\n", err)
-		return
-	}
+// 	// 导出样本库
+// 	fmt.Printf("导出样本库到: %s\n", outputFile)
+// 	if err := processor.ExportLibrary(outputFile); err != nil {
+// 		fmt.Printf("导出样本库失败: %v\n", err)
+// 		return
+// 	}
 
-	fmt.Println("处理完成!")
-}
+// 	fmt.Println("处理完成!")
+// }

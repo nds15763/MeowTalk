@@ -39,8 +39,10 @@ import (
 
 // 全局SDK实例
 var (
-	sdk *MeowTalkSDK // from types.go
-	mu  sync.RWMutex
+	sdk           *MeowTalkSDK // from types.go
+	mu            sync.RWMutex
+	debugMode     bool // 调试模式标志
+	mockProcessor *MockAudioProcessor
 )
 
 // InitializeSDK 初始化SDK
@@ -99,6 +101,16 @@ func InitializeSDK(config AudioStreamConfig) bool {
 	fmt.Printf("SDK initialized with sample rate: %d Hz, buffer size: %d\n",
 		config.SampleRate, config.BufferSize)
 	return true
+}
+
+// SetDebugMode 设置调试模式
+func SetDebugMode(enabled bool) {
+	mu.Lock()
+	defer mu.Unlock()
+	debugMode = enabled
+	if enabled {
+		mockProcessor = &MockAudioProcessor{}
+	}
 }
 
 // StartAudioStream 开始音频流会话
@@ -204,6 +216,11 @@ func RecvMessage(streamId string) ([]byte, error) {
 
 // processBuffer 处理音频缓冲区并返回结果
 func processBuffer(session *AudioStreamSession) ([]byte, error) {
+	if debugMode && mockProcessor != nil {
+		// 在调试模式下使用mock处理器
+		return mockProcessor.ProcessAudio(session.Buffer)
+	}
+
 	if len(session.Buffer) < sdk.Config.BufferSize {
 		return nil, fmt.Errorf("buffer size too small: %d < %d", len(session.Buffer), sdk.Config.BufferSize)
 	}

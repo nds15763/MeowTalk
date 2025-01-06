@@ -1,36 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  SafeAreaView,
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
 import AudioRecorder from './AudioRecorder';
+import { MOCK_CONFIG } from '../config/mock';
 
-const TestAudioPage: React.FC = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const [audioData, setAudioData] = useState<any>(null);
+const isWeb = Platform.OS === 'web';
+
+export default function TestAudioPage() {
   const [logs, setLogs] = useState<string[]>([]);
-  const lastLogTime = useRef<number>(0);
+  const [audioData, setAudioData] = useState<any>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [emotion, setEmotion] = useState<string>('');
+  const [confidence, setConfidence] = useState<number>(0);
+  const lastLogTime = useRef<number | null>(null);
+  const streamIdRef = useRef<string>(`stream_${Date.now()}`);
 
-  // 添加日志
   const addLog = (message: string) => {
-    if (!isRecording) return;
-    // 限制日志数量，只保留最近的 50 条
-    setLogs(prev => {
-      const newLogs = [`[${new Date().toISOString()}] ${message}`, ...prev];
-      return newLogs.slice(0, 50); // 只保留最近的 50 条日志
-    });
+    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
-  // 处理录音数据
-  const handleAudioData = (data: any) => {
-    // 先判断录音状态，如果不在录音就直接返回
-    if (!isRecording) return;
-
+  const handleAudioData = async (data: any) => {
     setAudioData(data);
+    
     // 只在音量变化显著时才记录日志
     if (data.metering !== undefined) {
       const now = Date.now();
@@ -39,117 +29,110 @@ const TestAudioPage: React.FC = () => {
         lastLogTime.current = now;
       }
     }
+
+    if (isWeb && MOCK_CONFIG.ENABLE_MOCK && isRecording) {
+      try {
+        // 发送音频数据到mock服务器
+        const response = await fetch(`${MOCK_CONFIG.SERVER.URL}/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            streamId: streamIdRef.current,
+            data: Array.from(new Float32Array(data.audioData || [])),
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`发送音频失败: ${response.status}`);
+        }
+        
+        // 获取处理结果
+        const resultResponse = await fetch(`${MOCK_CONFIG.SERVER.URL}/recv?streamId=${streamIdRef.current}`);
+        if (!resultResponse.ok) {
+          throw new Error(`接收结果失败: ${resultResponse.status}`);
+        }
+        
+        const result = await resultResponse.json();
+        if (result.emotion) {
+          setEmotion(result.emotion);
+          setConfidence(result.confidence);
+          addLog(`检测到情绪: ${result.emotion} (置信度: ${result.confidence})`);
+        }
+      } catch (err: any) {
+        console.warn('Mock处理警告:', err);
+        addLog(`Mock处理警告: ${err.message}`);
+      }
+    }
   };
 
-  // 处理录音状态变化
-  const handleRecordingStateChange = (recording: boolean) => {
-    console.log('录音状态变化:', recording);
+  const handleEmotionDetected = (result: any) => {
+    setEmotion(result.emotion);
+    setConfidence(result.confidence);
+    addLog(`检测到情绪: ${result.emotion} (置信度: ${result.confidence})`);
+  };
+
+  const handleRecordingState = (recording: boolean) => {
     setIsRecording(recording);
-    
-    if (!recording) {
-      // 在录音停止时清除音频数据
-      setAudioData(null);
-      addLog('录音已停止');
-    } else {
-      addLog('录音已开始');
-    }
+    addLog(recording ? '开始录音' : '停止录音');
   };
-
-  // 在录音状态改变时清理
-  useEffect(() => {
-    if (!isRecording) {
-      setAudioData(null);
-    }
-  }, [isRecording]);
-
-  // 在组件卸载时清理日志
-  useEffect(() => {
-    return () => {
-      setLogs([]);
-      lastLogTime.current = 0;
-    };
-  }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>音频测试页面</Text>
-      </View>
-
-      <View style={styles.content}>
         <AudioRecorder
+          onEmotionDetected={handleEmotionDetected}
           onAudioData={handleAudioData}
-          onRecordingState={handleRecordingStateChange}
+          onRecordingState={handleRecordingState}
           onLog={addLog}
         />
-
-        <View style={styles.dataDisplay}>
-          <Text style={styles.subtitle}>音频数据信息:</Text>
-          {audioData && isRecording && (
-            <Text>
-              音量: {audioData.metering?.toFixed(2) || 0}{'\n'}
-              录音时长: {audioData.durationMillis}ms{'\n'}
-              录制状态: {isRecording ? '录制中' : '已停止'}{'\n'}
-              完成状态: {audioData.isDoneRecording ? '已完成' : '未完成'}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.logContainer}>
-          <Text style={styles.subtitle}>调试日志:</Text>
-          {logs.map((log, index) => (
-            <Text key={index} style={styles.logText}>
-              {log}
-            </Text>
-          ))}
-        </View>
       </View>
-    </SafeAreaView>
+      
+      <View style={styles.infoContainer}>
+        <Text style={styles.infoText}>录音状态: {isRecording ? '录音中' : '已停止'}</Text>
+        <Text style={styles.infoText}>当前音量: {audioData?.metering?.toFixed(2) || 0}</Text>
+        <Text style={styles.infoText}>情绪: {emotion || '未检测'}</Text>
+        <Text style={styles.infoText}>置信度: {(confidence * 100).toFixed(1)}%</Text>
+      </View>
+
+      <ScrollView style={styles.logContainer}>
+        {logs.map((log, index) => (
+          <Text key={index} style={styles.logText}>{log}</Text>
+        ))}
+      </ScrollView>
+    </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  infoContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
   },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  dataDisplay: {
-    marginTop: 20,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-  },
-  subtitle: {
+  infoText: {
     fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 8,
   },
   logContainer: {
-    marginTop: 20,
     flex: 1,
-    padding: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    backgroundColor: 'white',
+    padding: 10,
+    borderRadius: 10,
   },
   logText: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
 });
-export default TestAudioPage;
-
