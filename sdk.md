@@ -110,54 +110,6 @@ void ReleaseSDK(void);
 
 ## 调用示例
 
-### C 示例
-```c
-#include "meowsdk.h"
-#include <stdio.h>
-
-int main() {
-    // 1. 初始化SDK
-    AudioConfig config = {
-        .model_path = "models/cat_emotion.model",
-        .sample_rate = 44100,
-        .buffer_size = 4096
-    };
-    
-    if (InitSDK(&config) != ERR_SUCCESS) {
-        printf("SDK初始化失败\n");
-        return -1;
-    }
-
-    // 2. 开始音频流
-    const char* streamId = "test_stream";
-    if (StartStream(streamId) != ERR_SUCCESS) {
-        printf("开启音频流失败\n");
-        return -1;
-    }
-
-    // 3. 发送音频数据
-    unsigned char audioData[4096];
-    // ... 获取音频数据 ...
-    if (!SendAudio(streamId, audioData, sizeof(audioData))) {
-        printf("发送音频数据失败\n");
-    }
-
-    // 4. 接收结果
-    char* result = RecvMessage(streamId);
-    if (result) {
-        printf("识别结果: %s\n", result);
-        free(result);  // 注意释放内存
-    }
-
-    // 5. 停止音频流
-    StopStream(streamId);
-
-    // 6. 释放SDK
-    ReleaseSDK();
-    return 0;
-}
-```
-
 ### React Native 示例
 ```typescript
 import { NativeModules } from 'react-native';
