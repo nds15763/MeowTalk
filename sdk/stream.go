@@ -59,11 +59,16 @@ func InitializeSDK(config AudioStreamConfig) bool {
 		return false
 	}
 
+	if config.SampleLibraryPath == "" {
+		fmt.Println("Error: Sample library path not specified")
+		return false
+	}
+
 	// 创建样本库
 	sampleLib := NewSampleLibrary()
 
 	// 加载样本库文件
-	err := sampleLib.LoadFromFile("sdk/sample_library.json")
+	err := sampleLib.LoadFromFile(config.SampleLibraryPath)
 	if err != nil {
 		fmt.Printf("Failed to load sample library: %v\n", err)
 		return false
@@ -101,20 +106,28 @@ func StartAudioStream(streamId string) error {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// 检查SDK是否已初始化
 	if sdk == nil {
 		return fmt.Errorf("SDK not initialized")
 	}
 
-	// 创建新的会话
+	// 检查流ID是否为空
+	if streamId == "" {
+		return fmt.Errorf("stream ID cannot be empty")
+	}
+
+	// 创建新的音频流会话
 	session := &AudioStreamSession{
 		ID:               streamId,
 		FeatureExtractor: NewFeatureExtractor(sdk.Config.SampleRate),
 		Buffer:           make([]float64, 0),
+		ResultChan:       make(chan []byte, 10),
 		Active:           true,
-		ResultChan:       make(chan []byte, 10), // 添加结果通道
 	}
 
+	// 添加到会话映射
 	sdk.Sessions[streamId] = session
+
 	return nil
 }
 
@@ -191,6 +204,10 @@ func RecvMessage(streamId string) ([]byte, error) {
 
 // processBuffer 处理音频缓冲区并返回结果
 func processBuffer(session *AudioStreamSession) ([]byte, error) {
+	if len(session.Buffer) < sdk.Config.BufferSize {
+		return nil, fmt.Errorf("buffer size too small: %d < %d", len(session.Buffer), sdk.Config.BufferSize)
+	}
+
 	// 1. 提取特征
 	rawFeatures := session.FeatureExtractor.Extract(&AudioData{
 		Samples:    session.Buffer[:sdk.Config.BufferSize],
@@ -211,15 +228,20 @@ func processBuffer(session *AudioStreamSession) ([]byte, error) {
 		Confidence: confidence,
 		Metadata: AudioStreamMeta{
 			AudioLength: sdk.Config.BufferSize,
-			Features:    rawFeatures, // 保留原始特征用于调试
+			Features:    rawFeatures,
 		},
 	}
 
-	// 5. 更新缓冲区（保留未处理的数据）
+	// 5. 序列化结果
+	data, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal result: %v", err)
+	}
+
+	// 6. 更新缓冲区（保留未处理的数据）
 	session.Buffer = session.Buffer[sdk.Config.BufferSize:]
 
-	// 6. 返回JSON结果
-	return json.Marshal(result)
+	return data, nil
 }
 
 // StopAudioStream 停止音频流会话

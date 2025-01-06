@@ -51,9 +51,10 @@ type SampleProcessor struct {
 // ---------------Stream SDK---------------
 // AudioStreamConfig SDK配置
 type AudioStreamConfig struct {
-	ModelPath  string `json:"model"`
-	SampleRate int    `json:"sampleRate"`
-	BufferSize int    `json:"bufferSize"`
+	ModelPath         string `json:"model"`
+	SampleRate        int    `json:"sampleRate"`
+	BufferSize        int    `json:"bufferSize"`
+	SampleLibraryPath string `json:"sampleLibraryPath"`
 }
 
 // AudioStreamResult 实时识别结果
@@ -99,11 +100,11 @@ var (
 
 // 音频相关常量
 const (
-	MinSampleRate   = 8000
-	MaxSampleRate   = 48000
-	MaxSampleValue  = 32767
-	MinSampleValue  = -32768
-	MaxBufferSize   = 1024 * 1024 // 1MB
+	MinSampleRate  = 8000
+	MaxSampleRate  = 48000
+	MaxSampleValue = 32767
+	MinSampleValue = -32768
+	MaxBufferSize  = 1024 * 1024 // 1MB
 )
 
 // MapToAudioFeature 将特征映射转换为AudioFeature结构
