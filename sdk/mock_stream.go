@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // MockAudioProcessor 用于开发测试的mock处理器
@@ -25,6 +27,12 @@ type MockResult struct {
 type SendAudioRequest struct {
 	StreamID string    `json:"streamId"`
 	Data     []float64 `json:"data"`
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true // 允许所有来源，仅用于测试
+	},
 }
 
 func (m *MockAudioProcessor) ProcessAudio(data []float64) ([]byte, error) {
@@ -58,80 +66,99 @@ func (m *MockAudioProcessor) StartMockServer(port int) error {
 
 // HTTP处理函数
 func (m *MockAudioProcessor) handleInit(w http.ResponseWriter, r *http.Request) {
+	// 设置CORS头部
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+
+	// 处理OPTIONS预检请求
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		log.Printf("错误的请求方法: %s\n", r.Method)
 		return
 	}
 
-	// 设置CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
 func (m *MockAudioProcessor) handleStart(w http.ResponseWriter, r *http.Request) {
+	// 设置CORS头部
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+	w.Header().Set("Content-Type", "application/json")
+
+	// 处理OPTIONS预检请求
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		log.Printf("错误的请求方法: %s\n", r.Method)
 		return
 	}
 
-	// 设置CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-
-	// 生成新的streamId
-	streamID := fmt.Sprintf("mock-%d", time.Now().UnixNano())
-	m.sessions.Store(streamID, &sync.Map{})
-
-	json.NewEncoder(w).Encode(map[string]string{"streamId": streamID})
-}
-
-func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		log.Printf("错误的请求方法: %s\n", r.Method)
-		return
+	// 解析请求体
+	var req struct {
+		StreamID string `json:"streamId"`
 	}
-
-	// 设置CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-
-	var req SendAudioRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		log.Printf("解析请求失败: %v\n", err)
 		return
 	}
 
-	// 打印音频数据信息
-	dataLen := len(req.Data)
-	var maxVal, minVal, sum float64
-	if dataLen > 0 {
-		maxVal = req.Data[0]
-		minVal = req.Data[0]
-		for _, v := range req.Data {
-			sum += v
-			if v > maxVal {
-				maxVal = v
-			}
-			if v < minVal {
-				minVal = v
-			}
-		}
+	// 使用客户端提供的 streamId
+	if req.StreamID == "" {
+		http.Error(w, "StreamID is required", http.StatusBadRequest)
+		log.Printf("StreamID 不能为空\n")
+		return
 	}
-	
-	log.Printf("收到音频数据 - StreamID: %s, 数据点数: %d, 最大值: %.2f, 最小值: %.2f, 平均值: %.2f\n",
-		req.StreamID, dataLen, maxVal, minVal, sum/float64(dataLen))
+
+	// 存储会话
+	m.sessions.Store(req.StreamID, &sync.Map{})
+	log.Printf("创建新会话 - StreamID: %s\n", req.StreamID)
+
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) {
+	// 设置CORS头部
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+	w.Header().Set("Content-Type", "application/json")
+
+	// 处理OPTIONS预检请求
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req SendAudioRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
 
 	// 处理音频数据
 	result, err := m.ProcessAudio(req.Data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Printf("处理音频数据失败: %v\n", err)
 		return
 	}
 
@@ -144,60 +171,79 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 }
 
 func (m *MockAudioProcessor) handleReceive(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		log.Printf("错误的请求方法: %s\n", r.Method)
+	// 设置CORS头部
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+	w.Header().Set("Content-Type", "application/json")
+
+	// 处理OPTIONS预检请求
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
-	// 设置CORS
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-	streamID := r.URL.Query().Get("streamId")
-	if streamID == "" {
-		http.Error(w, "Missing streamId", http.StatusBadRequest)
-		log.Printf("缺少 streamId 参数\n")
+	var req struct {
+		StreamID string `json:"streamId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	session, ok := m.sessions.Load(req.StreamID)
+	if !ok {
+		http.Error(w, "Session not found", http.StatusNotFound)
 		return
 	}
 
 	// 返回最新的结果
-	if session, ok := m.sessions.Load(streamID); ok {
-		var lastResult []byte
-		session.(*sync.Map).Range(func(key, value interface{}) bool {
-			lastResult = value.([]byte)
-			return false // 只获取最新的一个结果
-		})
-		if lastResult != nil {
-			w.Write(lastResult)
-			return
-		}
-	}
+	var latestResult []byte
+	session.(*sync.Map).Range(func(key, value interface{}) bool {
+		latestResult = value.([]byte)
+		return true
+	})
 
-	// 如果没有结果，返回空对象
-	json.NewEncoder(w).Encode(map[string]interface{}{})
-}
-
-func (m *MockAudioProcessor) handleStop(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		log.Printf("错误的请求方法: %s\n", r.Method)
+	if latestResult == nil {
+		json.NewEncoder(w).Encode(map[string]string{"message": "No results available"})
 		return
 	}
 
-	// 设置CORS
+	w.Write(latestResult)
+}
+
+func (m *MockAudioProcessor) handleStop(w http.ResponseWriter, r *http.Request) {
+	// 设置CORS头部
 	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
 	w.Header().Set("Content-Type", "application/json")
 
-	streamID := r.URL.Query().Get("streamId")
-	if streamID == "" {
-		http.Error(w, "Missing streamId", http.StatusBadRequest)
-		log.Printf("缺少 streamId 参数\n")
+	// 处理OPTIONS预检请求
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		StreamID string `json:"streamId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	// 删除会话
-	m.sessions.Delete(streamID)
-
+	m.sessions.Delete(req.StreamID)
 	json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }

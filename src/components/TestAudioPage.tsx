@@ -13,7 +13,7 @@ export default function TestAudioPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const lastLogTime = useRef<number>(0);
   const streamIdRef = useRef<string>(`stream_${Date.now()}`);
-  const logsEndRef = useRef<View>(null);
+  const logsEndRef = useRef<ScrollView>(null);
   const retryCount = useRef<number>(0);
   const MAX_RETRIES = 3;
 
@@ -22,9 +22,13 @@ export default function TestAudioPage() {
     setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
     
     // 自动滚动到最新日志
-    // setTimeout(() => {
-    //   logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    // }, 100);
+    setTimeout(() => {
+      if (isWeb) {
+        (logsEndRef.current as any)?.scrollIntoView?.({ behavior: 'smooth' });
+      } else {
+        logsEndRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 100);
   }, []);
 
   // 发送音频数据到mock服务器
@@ -82,20 +86,13 @@ export default function TestAudioPage() {
 
   const handleAudioData = useCallback((data: any) => {
     setAudioData(data);
-    
-    // 每500ms记录一次音频状态
-    const now = Date.now();
-    if (now - lastLogTime.current >= 500) {
-      const audioSamples = data.audioData?.slice(0, 5).map((v: number) => v.toFixed(2)).join(', ') || '';
-      addLog(`音频数据: [${audioSamples}...] 音量: ${(data.metering * 100).toFixed(0)}% 时长: ${data.durationMillis}ms`);
-      lastLogTime.current = now;
-    }
-
-    // 只在web端的mock模式下发送数据到mock服务器
-    if (isWeb && MOCK_CONFIG.ENABLE_MOCK && isRecording && data.audioData) {
-      sendAudioData(streamIdRef.current, data.audioData);
-    }
-  }, [addLog, isRecording, sendAudioData]);
+    // 使用现有的日志系统输出音频数据
+    addLog(JSON.stringify({
+      audioLevel: data.metering,
+      duration: data.durationMillis,
+      dataSize: data.audioData ? data.audioData.length : 0
+    }, null, 2));
+  }, [addLog]);
 
   const handleEmotionDetected = useCallback((result: any) => {
     setEmotion(result.emotion);
@@ -130,11 +127,10 @@ export default function TestAudioPage() {
 
       <View style={styles.logsContainer}>
         <Text style={styles.title}>录音日志:</Text>
-        <ScrollView style={styles.logs}>
+        <ScrollView ref={logsEndRef} style={styles.logs}>
           {logs.map((log, index) => (
             <Text key={index} style={styles.logText}>{log}</Text>
           ))}
-          <View ref={logsEndRef} />
         </ScrollView>
       </View>
     </View>
