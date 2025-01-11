@@ -5,16 +5,12 @@
     "version": "1.0.0",
     "platforms": [
       "ios",
-      "android",
-      "web"
+      "android"
     ],
     "splash": {
       "image": "./images/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
-    },
-    "web": {
-      "favicon": "./images/favicon.png"
     },
     "extra": {
       "eas": {
@@ -22,10 +18,13 @@
       }
     },
     "android": {
-      "package": "com.xyakim.MeowTalk"
+      "package": "com.xyakim.MeowTalk",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResources": true
     },
     "ios": {
-      "bundleIdentifier": "com.xyakim.MeowTalk"
+      "bundleIdentifier": "com.xyakim.MeowTalk",
+      "buildNumber": "1"
     }
   }
 }
