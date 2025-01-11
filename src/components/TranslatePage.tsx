@@ -11,7 +11,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Dimensions, AppState, AppStateStatus, ImageBackground } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, 
+  Dimensions, AppState, AppStateStatus, ImageBackground,Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
@@ -110,8 +111,11 @@ export default function TranslatePage() {
         >
           <View style={styles.container}>
             <View style={styles.header}>
-              <Text style={styles.headerText}>MeowTalk</Text>
-              <Text style={styles.subHeaderText}>Select emotion</Text>
+            <Image 
+              source={require('../../images/banner.png')}
+              style={styles.headerLogo}
+            />
+              <Text style={styles.subHeaderText}>Click the emotion card to play</Text>
             </View>
             <View style={styles.tabContainer}>
               {emotionCategories.map((category) => (
@@ -161,6 +165,11 @@ export default function TranslatePage() {
 }
 
 const styles = StyleSheet.create({
+  headerLogo: {
+    width:200,  
+    height: 45,
+    resizeMode: 'contain',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
@@ -226,11 +235,10 @@ const styles = StyleSheet.create({
   emotionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    padding: 20,
-    paddingHorizontal: 40,
+    justifyContent: 'center',
+    padding: 10,
+    width: '100%', // 改为100%而不是固定宽度
     gap: 10,
-    width: windowWidth - 80,
   },
   emotionButton: {
     borderRadius: 10,
@@ -241,7 +249,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   selectedEmotion: {
-    backgroundColor: '#FF1493',
+    backgroundColor: '#A864AF',
   },
   emotionIcon: {
     fontSize: 24,
