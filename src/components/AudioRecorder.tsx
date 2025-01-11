@@ -1,19 +1,33 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, PermissionsAndroid, NativeModules, NativeEventEmitter } from 'react-native';
-import { MOCK_CONFIG, MockSDK, mockEventEmitter } from '../config/mock';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, PermissionsAndroid } from 'react-native';
+import { MOCK_CONFIG } from '../config/mock';
+import AudioRecorderPlayer, {
+  AVEncoderAudioQualityIOSType,
+  AVEncodingOption,
+  AudioSourceAndroidType,
+  OutputFormatAndroidType,
+  AudioEncoderAndroidType,
+  AudioSet
+} from 'react-native-audio-recorder-player';
 
 // 在文件顶部添加 Web 平台检测
 const isWeb = Platform.OS === 'web';
 
-// SDK 配置
-const MeowTalkSDKModule = Platform.select({
-  web: MOCK_CONFIG.ENABLE_MOCK ? MockSDK : undefined,
-  default: NativeModules.MeowTalkSDK,
-});
+// SDK 模块类型定义
+interface MeowTalkSDKType {
+  initializeSDK: (config: { model: string }) => Promise<void>;
+}
 
-const sdkEvents = isWeb && MOCK_CONFIG.ENABLE_MOCK 
-  ? mockEventEmitter 
-  : new NativeEventEmitter(MeowTalkSDKModule);
+// SDK 模块声明
+declare const MeowTalkSDKModule: MeowTalkSDKType;
+
+// SDK 事件类型定义
+interface SDKEvents {
+  addListener: (event: string, callback: (result: any) => void) => { remove: () => void };
+}
+
+// SDK 事件模块声明
+declare const sdkEvents: SDKEvents;
 
 interface AudioRecorderProps {
   onEmotionDetected?: (result: any) => void;
@@ -24,11 +38,21 @@ interface AudioRecorderProps {
 
 export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecordingState, onLog }: AudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [recordSecs, setRecordSecs] = useState(0);
+  const [recordTime, setRecordTime] = useState('00:00:00');
   const timestamp = (new Date()).valueOf();
   const [streamId] = useState(`stream_${timestamp}`);
+  const audioRecorderPlayer = new AudioRecorderPlayer();
+
+  // 音频配置
+  const audioSet: AudioSet = {
+    AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+    AudioSourceAndroid: AudioSourceAndroidType.MIC,
+    OutputFormatAndroid: OutputFormatAndroidType.AAC_ADTS,
+    AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+    AVNumberOfChannelsKeyIOS: 2,
+    AVFormatIDKeyIOS: AVEncodingOption.aac,
+  };
 
   // 初始化SDK
   useEffect(() => {
@@ -76,46 +100,6 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
     initSDK();
   }, [isWeb, streamId, onLog]);
 
-  // 音量监控
-  const monitorVolume = useCallback((startTime: number) => {
-    if (!isRecording || !analyser) return;
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(dataArray);
-    
-    const average = dataArray.reduce((acc, val) => acc + val, 0) / dataArray.length;
-    const volume = average / 255;
-    
-    const audioDataPacket = {
-      metering: volume,
-      durationMillis: Date.now() - startTime,
-      audioData: Array.from(dataArray)
-    };
-
-    // 调用SDK的send接口
-    fetch(`${MOCK_CONFIG.SERVER.URL}/send`, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        streamId,
-        data: Array.from(dataArray),
-      }),
-    }).catch(error => {
-      onLog?.(`发送音频数据失败: ${error}`);
-    });
-
-    onAudioData?.(audioDataPacket);
-    
-    // 确保在录音状态下持续监控
-    if (isRecording) {
-      requestAnimationFrame(() => monitorVolume(startTime));
-    }
-  }, [isRecording, analyser, streamId, onAudioData, onLog]);
-
   // Web 平台的录音实现
   const startWebRecording = async () => {
     try {
@@ -144,28 +128,36 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
 
       onLog?.('开始录音会话成功');
 
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
+      // 开始录音
+      const uri = await audioRecorderPlayer.startRecorder(undefined, audioSet);
+      audioRecorderPlayer.addRecordBackListener((e) => {
+        setRecordSecs(e.currentPosition);
+        setRecordTime(audioRecorderPlayer.mmssss(Math.floor(e.currentPosition)));
+        
+        // 发送音频数据
+        const audioDataPacket = {
+          metering: e.currentMetering || 0,
+          durationMillis: e.currentPosition,
+          audioData: e.currentMetering ? [e.currentMetering] : []
+        };
+
+        fetch(`${MOCK_CONFIG.SERVER.URL}/send`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            streamId,
+            data: e.currentMetering ? [e.currentMetering] : [],
+          }),
+        }).catch(error => {
+          onLog?.(`发送音频数据失败: ${error}`);
+        });
+
+        onAudioData?.(audioDataPacket);
       });
-      
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
 
-      const context = new AudioContext();
-      const source = context.createMediaStreamSource(stream);
-      const analyserNode = context.createAnalyser();
-      source.connect(analyserNode);
-      setAudioContext(context);
-      setAnalyser(analyserNode);
-
-      const startTime = Date.now();
-      monitorVolume(startTime);
-      
-      recorder.start();
       setIsRecording(true);
       onRecordingState?.(true);
       onLog?.('开始录音');
@@ -177,16 +169,14 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
 
   // 停止 Web 录音
   const stopWebRecording = async () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
-    }
-    if (audioContext) {
-      audioContext.close();
-    }
-
-    // 调用stop接口
     try {
+      if (audioRecorderPlayer) {
+        const result = await audioRecorderPlayer.stopRecorder();
+        audioRecorderPlayer.removeRecordBackListener();
+        onLog?.('录音已停止');
+      }
+
+      // 调用 stop 接口
       const stopResponse = await fetch(`${MOCK_CONFIG.SERVER.URL}/stop`, {
         method: 'POST',
         headers: {
@@ -209,12 +199,8 @@ export default function AudioRecorder({ onEmotionDetected, onAudioData, onRecord
       onLog?.(`停止录音失败: ${error.message}`);
     }
 
-    setMediaRecorder(null);
-    setAudioContext(null);
-    setAnalyser(null);
     setIsRecording(false);
     onRecordingState?.(false);
-    onLog?.('停止录音');
   };
 
   // 请求录音权限
