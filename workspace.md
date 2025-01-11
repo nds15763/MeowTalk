@@ -75,8 +75,9 @@ MeowTalk/
 
 ### 3.3 声音识别 SDK
 1. **编译目标**
-   - Linux/Android: meowsdk.so
-   - iOS: meowsdk.dylib
+   - Linux/Android: meowsdk.arm64.so (动态库)
+   - iOS: meowsdk.a (静态库)
+   - Windows: meowsdk.dll (动态库)
    - 头文件: meowsdk.h
 
 2. **核心功能**
@@ -98,6 +99,13 @@ MeowTalk/
    func LoadSampleLibrary(path string) error
    func UpdateModel(samples []Sample) error
    ```
+
+4. **编译指南**
+   - 详细的编译命令和说明请参考 `sdk/make.md`
+   - 编译前确保已安装必要的工具：
+     - Go 1.21.3+
+     - Android NDK (Android 编译)
+     - Xcode Command Line Tools (iOS 编译)
 
 ### 3.4 音频资源库
 - **情绪类别**

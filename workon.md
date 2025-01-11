@@ -23,13 +23,13 @@
   - [x] 尝试 Windows 环境配置
     - [x] 安装 Chocolatey
     - [x] 安装 MinGW
-  - [ ] 转移到 Mac 环境开发
-    - [ ] 同步代码到 Mac
-    - [ ] 验证 Mac 开发环境
-    - [ ] 安装必要工具
-  - [ ] 编译目标平台SDK
-    - [ ] 编译 Linux/Android (meowsdk.so)
-    - [ ] 编译 iOS (meowsdk.dylib)
+  - [x] 转移到 Mac 环境开发
+    - [x] 同步代码到 Mac
+    - [x] 验证 Mac 开发环境
+    - [x] 安装必要工具
+  - [x] 编译目标平台SDK
+    - [x] 编译 Linux/Android (meowsdk.so)
+    - [x] 编译 iOS (meowsdk.a)
     - [ ] 编译 Windows (meowsdk.dll)
   - [ ] 准备测试用例
     - [ ] 创建测试音频样本
@@ -81,33 +81,7 @@
    ```
 
 ### SDK 编译步骤
-1. Linux/Android 版本 (.so)
-   ```bash
-   cd MeowTalk/sdk
-
-   # 1. 编译 Linux 版本
-   GOOS=linux GOARCH=amd64 go build -o meowsdk.so -buildmode=c-shared
-
-   # 2. 编译 Android 版本（需要分别编译不同架构）
-   GOOS=android GOARCH=arm64 go build -o meowsdk.arm64.so -buildmode=c-shared
-   GOOS=android GOARCH=arm go build -o meowsdk.arm.so -buildmode=c-shared
-   ```
-
-2. iOS 版本 (.dylib)
-   ```bash
-   # 1. 编译 iOS 版本
-   GOOS=darwin GOARCH=arm64 go build -o meowsdk.dylib -buildmode=c-shared
-   ```
-
-3. 验证编译结果
-   ```bash
-   # 检查生成的文件
-   ls -l meowsdk.*
-   
-   # 验证动态库是否正确
-   file meowsdk.so
-   file meowsdk.dylib
-   ```
+请参考 `sdk/make.md` 文件，其中包含了详细的编译命令和说明。
 
 ### 测试准备
 1. 单元测试

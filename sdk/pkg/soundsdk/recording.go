@@ -1,4 +1,4 @@
-package main
+package soundsdk
 
 import (
 	"encoding/json"
@@ -358,8 +358,8 @@ func (p *SampleProcessor) calculateStatistics() {
 		}
 
 		stats := EmotionStatistics{
-			SampleCount: len(samples),
-			MeanFeature: AudioFeature{},
+			SampleCount:   len(samples),
+			MeanFeature:   AudioFeature{},
 			StdDevFeature: AudioFeature{},
 		}
 

@@ -1,4 +1,4 @@
-package main
+package soundsdk
 
 import (
 	"encoding/json"

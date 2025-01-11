@@ -1,4 +1,4 @@
-package main
+package soundsdk
 
 // AudioFeature 存储提取的特征
 type AudioFeature struct {
