@@ -12,14 +12,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, 
-  Dimensions, AppState, AppStateStatus, ImageBackground,Image } from 'react-native';
+  Dimensions, AppState, AppStateStatus, ImageBackground, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
 
 const windowWidth = Dimensions.get('window').width;
-const buttonWidth = (windowWidth - 80) / 3; // 80 是左右边距和按钮之间的间隔
+const GRID_SPACING = Platform.OS === 'android' ? 12 : 15;
+const GRID_PADDING = Platform.OS === 'android' ? 16 : 20;
+const buttonWidth = (windowWidth - (2 * GRID_PADDING) - (2 * GRID_SPACING)) / 3;
 
 export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
@@ -54,23 +56,6 @@ export default function TranslatePage() {
     };
   }, []);
 
-  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-    if (
-      appState.current.match(/active/) && 
-      (nextAppState === 'background' || nextAppState === 'inactive')
-    ) {
-      // 应用进入后台，停止音频
-      if (sound) {
-        try {
-          await sound.stopAsync();
-        } catch (error) {
-          console.error('停止音频失败:', error);
-        }
-      }
-    }
-    appState.current = nextAppState;
-  };
-
   async function playSound(audioFile: any) {
     try {
       // 如果有正在播放的音频，先停止并卸载
@@ -83,11 +68,40 @@ export default function TranslatePage() {
         shouldPlay: true,
         volume: 1.0,
       });
+
+      // 监听播放完成事件
+      newSound.setOnPlaybackStatusUpdate(async (status: any) => {
+        if (status.didJustFinish) {
+          // 播放结束后自动卸载
+          await newSound.unloadAsync();
+          setSound(null);
+        }
+      });
+
       setSound(newSound);
     } catch (error) {
       console.error('播放音频失败:', error);
     }
   }
+
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    if (
+      appState.current.match(/active/) && 
+      (nextAppState === 'background' || nextAppState === 'inactive')
+    ) {
+      // 应用进入后台，停止并卸载音频
+      if (sound) {
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+          setSound(null);
+        } catch (error) {
+          console.error('停止音频失败:', error);
+        }
+      }
+    }
+    appState.current = nextAppState;
+  };
 
   const handleEmotionSelect = (emotion: Emotion) => {
     setSelectedEmotion(emotion);
@@ -141,8 +155,6 @@ export default function TranslatePage() {
                       style={[
                         styles.emotionButton,
                         selectedEmotion?.id === emotion.id && styles.selectedEmotion,
-                        { width: buttonWidth, height: buttonWidth },
-                        (index + 1) % 3 === 0 ? styles.lastInRow : null,
                       ]}
                       onPress={() => handleEmotionSelect(emotion)}
                     >
@@ -166,13 +178,12 @@ export default function TranslatePage() {
 
 const styles = StyleSheet.create({
   headerLogo: {
-    width:200,  
+    width: 200,  
     height: 45,
     resizeMode: 'contain',
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
     alignItems: 'center',
     overflow: 'hidden',
   },
@@ -196,27 +207,29 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    padding: 20,
+    padding: Platform.OS === 'android' ? 15 : 20,
   },
   headerText: {
-    fontSize: 24,
+    fontSize: Platform.OS === 'android' ? 20 : 24,
     fontWeight: 'bold',
+    textAlign: Platform.OS === 'android' ? 'center' : 'left',
   },
   subHeaderText: {
-    fontSize: 18,
+    fontSize: Platform.OS === 'android' ? 16 : 18,
     color: '#666',
+    textAlign: Platform.OS === 'android' ? 'center' : 'left',
   },
   tabContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: Platform.OS === 'android' ? 'space-around' : 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    paddingHorizontal: 20,
+    paddingHorizontal: Platform.OS === 'android' ? 10 : 20,
     width: '100%',
   },
   tabButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 30,
+    paddingVertical: Platform.OS === 'android' ? 8 : 10,
+    paddingHorizontal: Platform.OS === 'android' ? 15 : 30,
     width: '33%',
     alignItems: 'center',
   },
@@ -225,51 +238,55 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EF7C8E',
   },
   tabTitle: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'android' ? 14 : 16,
     fontWeight: 'bold',
+    textAlign: Platform.OS === 'android' ? 'center' : 'left',
   },
   scrollViewContainer: {
-    alignItems: 'center',
+    flex: 1,
     width: '100%',
   },
   emotionsContainer: {
+    padding: GRID_PADDING,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    padding: 10,
-    width: '100%', // 改为100%而不是固定宽度
-    gap: 10,
+    justifyContent: 'flex-start',
+    gap: GRID_SPACING,
   },
   emotionButton: {
-    borderRadius: 10,
-    backgroundColor: '#EF7C8E',
-    justifyContent: 'center',
+    height: Platform.OS === 'android' ? 100 : 110,
+    width: buttonWidth,
+    backgroundColor: '#FFE4E4',
+    borderRadius: 12,
+    padding: 10,
     alignItems: 'center',
-    marginBottom: 10,
-    marginRight: 10,
+    justifyContent: 'center',
+    elevation: Platform.OS === 'android' ? 3 : 0,
+    shadowColor: Platform.OS === 'ios' ? '#000' : undefined,
+    shadowOffset: Platform.OS === 'ios' ? { width: 0, height: 2 } : undefined,
+    shadowOpacity: Platform.OS === 'ios' ? 0.25 : undefined,
+    shadowRadius: Platform.OS === 'ios' ? 3.84 : undefined,
   },
   selectedEmotion: {
     backgroundColor: '#A864AF',
   },
   emotionIcon: {
-    fontSize: 24,
+    fontSize: Platform.OS === 'android' ? 20 : 24,
   },
   emotionTitle: {
-    marginTop: 5,
+    marginTop: Platform.OS === 'android' ? 3 : 5,
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: Platform.OS === 'android' ? 11 : 12,
     textAlign: 'center',
+    paddingHorizontal: Platform.OS === 'android' ? 2 : 0,
   },
   descriptionContainer: {
-    padding: 20,
+    padding: Platform.OS === 'android' ? 15 : 20,
     alignItems: 'center',
   },
   descriptionText: {
-    fontSize: 16,
+    fontSize: Platform.OS === 'android' ? 14 : 16,
     textAlign: 'center',
-  },
-  lastInRow: {
-    marginRight: 0,
   },
 });

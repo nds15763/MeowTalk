@@ -12,10 +12,15 @@
       "distribution": "internal"
     },
     "production": {
-      "android": {
+     "android": {
         "buildType": "app-bundle",
         "gradleCommand": ":app:bundleRelease",
-        "autoIncrement": true
+        "autoIncrement": true,
+        "env": {
+          "ENABLE_PROGUARD": "true",
+          "ENABLE_SHRINK_RESOURCES": "true",
+          "ENABLE_R8": "true"
+        }
       },
       "ios": {
         "autoIncrement": true,

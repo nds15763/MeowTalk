@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, ImageBackground, Dimensions } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Image, ImageBackground, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 
@@ -66,35 +66,37 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: Platform.OS === 'android' ? 15 : 20,
     backgroundColor: 'transparent',
   },
   logo: {
-    width: 200,
-    height: 200,
-    marginBottom: 50,
+    width: Platform.OS === 'android' ? 180 : 200,
+    height: Platform.OS === 'android' ? 180 : 200,
+    marginBottom: Platform.OS === 'android' ? 40 : 50,
   },
   title: {
-    fontSize: 27,
+    fontSize: Platform.OS === 'android' ? 24 : 27,
     color: '#fff',
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: Platform.OS === 'android' ? 8 : 10,
+    textAlign: Platform.OS === 'android' ? 'center' : 'left',
   },
   subtitle: {
-    fontSize: 19,
+    fontSize: Platform.OS === 'android' ? 16 : 19,
     color: '#fff',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: Platform.OS === 'android' ? 25 : 30,
   },
   button: {
     backgroundColor: '#A864AF',
-    paddingHorizontal: 40,
-    paddingVertical: 15,
+    paddingHorizontal: Platform.OS === 'android' ? 35 : 40,
+    paddingVertical: Platform.OS === 'android' ? 12 : 15,
     borderRadius: 25,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: Platform.OS === 'android' ? 16 : 18,
     fontWeight: 'bold',
+    textAlign: Platform.OS === 'android' ? 'center' : 'left',
   },
 });

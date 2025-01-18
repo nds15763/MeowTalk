@@ -3,12 +3,14 @@
     "name": "MeowTalk",
     "slug": "MeowTalk",
     "version": "1.0.0",
+    "icon": "./images/cat_logo.png",
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "splash": {
-      "image": "./images/splash.png",
+      "image": "./images/cat_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,18 +21,12 @@
     },
     "android": {
       "package": "com.xyakim.MeowTalk",
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResources": true,
-      "enableR8": true,
-      "targetSdkVersion": 33,
-      "compileSdkVersion": 33,
-      "buildToolsVersion": "33.0.0",
-      "abiFilters": ["armeabi-v7a", "arm64-v8a"],
-      "extraPackagerArgs": ["--config", "metro.config.js"]
+      "navigationBarColor": "#EF7C8E"
     },
     "ios": {
       "bundleIdentifier": "com.xyakim.MeowTalk",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "navigationBarColor": "#EF7C8E"
     }
   }
 }
