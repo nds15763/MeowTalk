@@ -19,9 +19,10 @@ import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
 
 const windowWidth = Dimensions.get('window').width;
-const GRID_SPACING = Platform.OS === 'android' ? 12 : 15;
-const GRID_PADDING = Platform.OS === 'android' ? 16 : 20;
-const buttonWidth = (windowWidth - (2 * GRID_PADDING) - (2 * GRID_SPACING)) / 3;
+const GRID_SPACING = 10;
+const GRID_PADDING = 14;
+const TOTAL_SPACING = (GRID_SPACING * 2) + (GRID_PADDING * 2); // 间距总和
+const buttonWidth = (windowWidth - TOTAL_SPACING) / 3; // 确保一行三个按钮
 
 export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
@@ -158,8 +159,10 @@ export default function TranslatePage() {
                       ]}
                       onPress={() => handleEmotionSelect(emotion)}
                     >
-                      <Text style={styles.emotionIcon}>{emotion.icon}</Text>
-                      <Text style={styles.emotionTitle}>{emotion.title}</Text>
+                      <View style={styles.emotionContent}>
+                        <Text style={styles.emotionIcon}>{emotion.icon}</Text>
+                        <Text style={styles.emotionTitle}>{emotion.title}</Text>
+                      </View>
                     </TouchableOpacity>
                   ))}
               </ScrollView>
@@ -207,30 +210,25 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    padding: Platform.OS === 'android' ? 15 : 20,
-  },
-  headerText: {
-    fontSize: Platform.OS === 'android' ? 20 : 24,
-    fontWeight: 'bold',
-    textAlign: Platform.OS === 'android' ? 'center' : 'left',
+    padding: 15,
   },
   subHeaderText: {
-    fontSize: Platform.OS === 'android' ? 16 : 18,
+    fontSize: 16,
     color: '#666',
-    textAlign: Platform.OS === 'android' ? 'center' : 'left',
+    textAlign: 'center',
   },
   tabContainer: {
     flexDirection: 'row',
-    justifyContent: Platform.OS === 'android' ? 'space-around' : 'space-between',
+    justifyContent: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    paddingHorizontal: Platform.OS === 'android' ? 10 : 20,
+    paddingHorizontal: 10,
     width: '100%',
   },
   tabButton: {
-    paddingVertical: Platform.OS === 'android' ? 8 : 10,
-    paddingHorizontal: Platform.OS === 'android' ? 15 : 30,
-    width: '33%',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: '25%',
     alignItems: 'center',
   },
   selectedTab: {
@@ -238,55 +236,71 @@ const styles = StyleSheet.create({
     borderBottomColor: '#EF7C8E',
   },
   tabTitle: {
-    fontSize: Platform.OS === 'android' ? 14 : 16,
+    fontSize: 14,
     fontWeight: 'bold',
-    textAlign: Platform.OS === 'android' ? 'center' : 'left',
+    textAlign: 'center',
   },
   scrollViewContainer: {
     flex: 1,
     width: '100%',
   },
   emotionsContainer: {
+    width: '80%',
     padding: GRID_PADDING,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'flex-start',
     gap: GRID_SPACING,
+    alignSelf: 'center',
   },
   emotionButton: {
-    height: Platform.OS === 'android' ? 100 : 110,
     width: buttonWidth,
+    aspectRatio: 1,
     backgroundColor: '#FFE4E4',
     borderRadius: 12,
     padding: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: Platform.OS === 'android' ? 3 : 0,
-    shadowColor: Platform.OS === 'ios' ? '#000' : undefined,
-    shadowOffset: Platform.OS === 'ios' ? { width: 0, height: 2 } : undefined,
-    shadowOpacity: Platform.OS === 'ios' ? 0.25 : undefined,
-    shadowRadius: Platform.OS === 'ios' ? 3.84 : undefined,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
+      },
+    }),
+  },
+  emotionContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   selectedEmotion: {
     backgroundColor: '#A864AF',
+    transform: [{ scale: 1.05 }],
   },
   emotionIcon: {
-    fontSize: Platform.OS === 'android' ? 20 : 24,
+    fontSize: 24,
+    marginBottom: 4,
   },
   emotionTitle: {
-    marginTop: Platform.OS === 'android' ? 3 : 5,
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: Platform.OS === 'android' ? 11 : 12,
+    color: '#333',
+    fontSize: 12,
     textAlign: 'center',
-    paddingHorizontal: Platform.OS === 'android' ? 2 : 0,
+    fontWeight: '500',
   },
   descriptionContainer: {
-    padding: Platform.OS === 'android' ? 15 : 20,
+    padding: 15,
     alignItems: 'center',
   },
   descriptionText: {
-    fontSize: Platform.OS === 'android' ? 14 : 16,
+    fontSize: 14,
     textAlign: 'center',
   },
 });
