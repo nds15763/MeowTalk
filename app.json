@@ -21,7 +21,11 @@
     },
     "android": {
       "package": "com.xyakim.MeowTalk",
-      "navigationBarColor": "#EF7C8E"
+      "navigationBarColor": "#EF7C8E",
+      "adaptiveIcon": {
+        "foregroundImage": "./images/cat_logo.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.xyakim.MeowTalk",
