@@ -5,6 +5,7 @@ import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
 import { Emotion, EmotionCategory } from '../types/emotion';
 import AudioRecorder from './AudioRecorder';
+import AITranslater from './AITranslater';
 
 const windowWidth = Dimensions.get('window').width;
 const buttonWidth = (windowWidth - 40) / 3;
@@ -13,6 +14,8 @@ export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory>(emotionCategories[1]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [audioFeatures, setAudioFeatures] = useState<any>(null);
+  const [translationResult, setTranslationResult] = useState<any>(null);
   const [detectedEmotion, setDetectedEmotion] = useState<any>(null);
 
   async function playSound(audioFile: any) {
@@ -58,9 +61,14 @@ export default function TranslatePage() {
     setSelectedEmotion(null);
   };
 
-  const handleEmotionDetected = (result: any) => {
-    setDetectedEmotion(result);
-    // TODO: 可以根据检测结果自动选择对应的情感类别
+  const handleEmotionDetected = (features: any) => {
+    setAudioFeatures(features);
+  };
+
+  const handleTranslationResult = (result: any) => {
+    setTranslationResult(result);
+    setSelectedCategory(emotionCategories.find(c => c.id === result.emotion.categoryId) || emotionCategories[0]);
+    setSelectedEmotion(result.emotion);
   };
 
   return (
@@ -70,8 +78,12 @@ export default function TranslatePage() {
         <Text style={styles.subHeaderText}>Select Emotion</Text>
       </View>
 
-      {/* 添加录音组件 */}
+      {/* 录音和AI翻译组件 */}
       <AudioRecorder onEmotionDetected={handleEmotionDetected} />
+      <AITranslater 
+        audioFeatures={audioFeatures}
+        onTranslationResult={handleTranslationResult}
+      />
 
       <View style={styles.tabContainer}>
         {emotionCategories.map((category) => (

@@ -15,7 +15,8 @@ export const MOCK_CONFIG = {
       SEND: '/send',
       RECV: '/recv',
       STOP: '/stop'
-    }
+    },
+    WS_URL:""
   },
 
   // SDK Mock 配置
