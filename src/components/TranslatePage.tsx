@@ -148,23 +148,25 @@ export default function TranslatePage() {
             </View>
             <View style={styles.scrollViewContainer}>
               <ScrollView contentContainerStyle={styles.emotionsContainer}>
-                {emotions
-                  .filter((emotion) => emotion.categoryId === selectedCategory.id)
-                  .map((emotion, index) => (
-                    <TouchableOpacity
-                      key={emotion.id}
-                      style={[
-                        styles.emotionButton,
-                        selectedEmotion?.id === emotion.id && styles.selectedEmotion,
-                      ]}
-                      onPress={() => handleEmotionSelect(emotion)}
-                    >
-                      <View style={styles.emotionContent}>
-                        <Text style={styles.emotionIcon}>{emotion.icon}</Text>
-                        <Text style={styles.emotionTitle}>{emotion.title}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.gridContainer}>
+                  {emotions
+                    .filter((emotion) => emotion.categoryId === selectedCategory.id)
+                    .map((emotion, index) => (
+                      <TouchableOpacity
+                        key={emotion.id}
+                        style={[
+                          styles.emotionButton,
+                          selectedEmotion?.id === emotion.id && styles.selectedEmotion,
+                        ]}
+                        onPress={() => handleEmotionSelect(emotion)}
+                      >
+                        <View style={styles.emotionContent}>
+                          <Text style={styles.emotionIcon}>{emotion.icon}</Text>
+                          <Text style={styles.emotionTitle}>{emotion.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </View>
               </ScrollView>
             </View>
             {selectedEmotion && (
@@ -245,36 +247,29 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   emotionsContainer: {
-    width: '80%',
-    padding: GRID_PADDING,
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  gridContainer: {
+    width: '100%',
+    maxWidth: 400,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
     gap: GRID_SPACING,
-    alignSelf: 'center',
   },
   emotionButton: {
-    width: buttonWidth,
+    width: `${100/3 - 6}%`,
     aspectRatio: 1,
-    backgroundColor: '#FFE4E4',
+    marginBottom: GRID_SPACING,
+    backgroundColor: '#FFE8E8',
     borderRadius: 12,
-    padding: 10,
+    padding: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-      },
-      android: {
-        elevation: 3,
-      },
-      web: {
-        boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
-      },
-    }),
   },
   emotionContent: {
     flex: 1,
