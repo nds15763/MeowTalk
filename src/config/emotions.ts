@@ -24,7 +24,13 @@ export const emotions: Emotion[] = [
     icon: '😺',
     title: 'Friendly Call',
     description: 'Friendly calling to other cats',
-    audioFile: require('../../audios/call.mp3'),
+    audioFiles: [
+      require('../../audios/call_1.mp3'),
+      require('../../audios/call_2.mp3'),
+      require('../../audios/call_3.mp3'),
+      require('../../audios/call_4.mp3'),
+      require('../../audios/call_5.mp3'),
+    ],
     categoryId: 'friendly',
   },
   {
@@ -32,7 +38,9 @@ export const emotions: Emotion[] = [
     icon: '😌',
     title: 'Comfortable',
     description: 'Your cat feels comfortable and relaxed',
-    audioFile: require('../../audios/comfortable.mp3'),
+    audioFiles: [
+      require('../../audios/comfortable_1.mp3'),
+    ],
     categoryId: 'friendly',
   },
   {
@@ -40,7 +48,10 @@ export const emotions: Emotion[] = [
     icon: '🥰',
     title: 'Affectionate',
     description: 'Affectionately calling to other cats',
-    audioFile: require('../../audios/flighty.mp3'),
+    audioFiles: [
+      require('../../audios/flighty_1.mp3'),
+      require('../../audios/flighty_2.mp3'),
+    ],
     categoryId: 'friendly',
   },
   {
@@ -48,7 +59,10 @@ export const emotions: Emotion[] = [
     icon: '😊',
     title: 'Satisfied',
     description: 'Feeling satisfied',
-    audioFile: require('../../audios/satisfy.mp3'),
+    audioFiles: [
+      require('../../audios/satisfy_1.mp3'),
+      require('../../audios/satisfy_2.mp3'),
+    ],
     categoryId: 'friendly',
   },
   {
@@ -56,7 +70,11 @@ export const emotions: Emotion[] = [
     icon: '😋',
     title: 'Delicious',
     description: 'Enjoying tasty food',
-    audioFile: require('../../audios/yummy.mp3'),
+    audioFiles: [
+      require('../../audios/yummy_1.mp3'),
+      require('../../audios/yummy_2.mp3'),
+      require('../../audios/yummy_3.mp3'),
+    ],
     categoryId: 'friendly',
   },
   {
@@ -64,7 +82,10 @@ export const emotions: Emotion[] = [
     icon: '👋',
     title: 'Greeting',
     description: 'Friendly greeting and being affectionate',
-    audioFile: require('../../audios/hello.mp3'),
+    audioFiles: [
+      require('../../audios/hello_1.mp3'),
+      require('../../audios/hello_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -72,7 +93,10 @@ export const emotions: Emotion[] = [
     icon: '🍽️',
     title: 'Food Request',
     description: 'Greeting and requesting food',
-    audioFile: require('../../audios/for_food.mp3'),
+    audioFiles: [
+      require('../../audios/for-food_1.mp3'),
+      require('../../audios/for-food_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -80,7 +104,11 @@ export const emotions: Emotion[] = [
     icon: '🎭',
     title: 'Play Invitation',
     description: 'Inviting to play',
-    audioFile: require('../../audios/ask_for_play.mp3'),
+    audioFiles: [
+      require('../../audios/ask-for-play_1.mp3'),
+      require('../../audios/ask-for-play_2.mp3'),
+      require('../../audios/ask-for-play_3.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -88,7 +116,10 @@ export const emotions: Emotion[] = [
     icon: '🐁',
     title: 'Hunt Invitation',
     description: 'Excited, wanting to hunt',
-    audioFile: require('../../audios/ask_for_hunting.mp3'),
+    audioFiles: [
+      require('../../audios/ask-for-hunting_1.mp3'),
+      require('../../audios/ask-for-hunting_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -96,7 +127,10 @@ export const emotions: Emotion[] = [
     icon: '😣',
     title: 'Distressed',
     description: 'Feeling upset, uncomfortable, leave me alone',
-    audioFile: require('../../audios/discomfort.mp3'),
+    audioFiles: [
+      require('../../audios/discomfort_1.mp3'),
+      require('../../audios/discomfort_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -104,7 +138,9 @@ export const emotions: Emotion[] = [
     icon: '🐈',
     title: 'Help/Finding Mom',
     description: 'Seeking help or looking for mom',
-    audioFile: require('../../audios/find_mom.mp3'),
+    audioFiles: [
+      require('../../audios/find_mom.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -112,7 +148,10 @@ export const emotions: Emotion[] = [
     icon: '😰',
     title: 'Anxious/Scared',
     description: 'Feeling anxious or scared',
-    audioFile: require('../../audios/anxious.mp3'),
+    audioFiles: [
+      require('../../audios/anxious_1.mp3'),
+      require('../../audios/anxious_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -120,7 +159,10 @@ export const emotions: Emotion[] = [
     icon: '💕',
     title: 'Mating Call',
     description: 'Looking for a mate',
-    audioFile: require('../../audios/courtship.mp3'),
+    audioFiles: [
+      require('../../audios/courtship_1.mp3'),
+      require('../../audios/courtship_2.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -128,7 +170,11 @@ export const emotions: Emotion[] = [
     icon: '🤔',
     title: 'Curious',
     description: 'Being perfunctory or curious',
-    audioFile: require('../../audios/curious.mp3'),
+    audioFiles: [
+      require('../../audios/curious_1.mp3'),
+      require('../../audios/curious_2.mp3'),
+      require('../../audios/curious_3.mp3'),
+    ],
     categoryId: 'attention',
   },
   {
@@ -136,7 +182,10 @@ export const emotions: Emotion[] = [
     icon: '🚫',
     title: 'Go Away!',
     description: 'Go away!',
-    audioFile: require('../../audios/goaway.mp3'),
+    audioFiles: [
+      require('../../audios/goaway_1.mp3'),
+      require('../../audios/goaway_2.mp3'),
+    ],
     categoryId: 'warning',
   },
   {
@@ -144,7 +193,10 @@ export const emotions: Emotion[] = [
     icon: '👉',
     title: 'Get Out!',
     description: 'Get out!',
-    audioFile: require('../../audios/goout.mp3'),
+    audioFiles: [
+      require('../../audios/goout_1.mp3'),
+      require('../../audios/goout_2.mp3'),
+    ],
     categoryId: 'warning',
   },
   {
@@ -152,7 +204,10 @@ export const emotions: Emotion[] = [
     icon: '💀',
     title: 'Back Off!',
     description: 'Back off immediately!',
-    audioFile: require('../../audios/dieaway.mp3'),
+    audioFiles: [
+      require('../../audios/dieaway_1.mp3'),
+      require('../../audios/dieaway_2.mp3'),
+    ],
     categoryId: 'warning',
   },
   {
@@ -160,7 +215,10 @@ export const emotions: Emotion[] = [
     icon: '⚠️',
     title: 'Warning',
     description: 'Warning and expulsion',
-    audioFile: require('../../audios/warning.mp3'),
+    audioFiles: [
+      require('../../audios/warning_1.mp3'),
+      require('../../audios/warning_2.mp3'),
+    ],
     categoryId: 'warning',
   },
   {
@@ -168,7 +226,10 @@ export const emotions: Emotion[] = [
     icon: '😒',
     title: 'Unhappy',
     description: 'Leave me alone, dissatisfied',
-    audioFile: require('../../audios/unhappy.mp3'),
+    audioFiles: [
+      require('../../audios/unhappy_1.mp3'),
+      require('../../audios/unhappy_2.mp3'),
+    ],
     categoryId: 'warning',
   },
   {
@@ -176,23 +237,20 @@ export const emotions: Emotion[] = [
     icon: '🚨',
     title: 'Alert',
     description: 'Hostile and vigilant',
-    audioFile: require('../../audios/alert.mp3'),
+    audioFiles: [
+      require('../../audios/alert_1.mp3'),
+    ],
     categoryId: 'warning',
   },
-  // {
-  //   id: 'for_fight',
-  //   icon: '🥊',
-  //   title: 'Strong Warning',
-  //   description: 'Strong warning, preparing to fight',
-  //   audioFile: require('../../audios/for_fight.mp3'),
-  //   categoryId: 'warning',
-  // },
-  // {
-  //   id: 'scared',
-  //   icon: '😱',
-  //   title: 'Scared',
-  //   description: 'Your cat feels scared or threatened.',
-  //   audioFile: require('../../audios/scared_meow.mp3'),
-  //   categoryId: 'warning',
-  // },
+  {
+    id: 'for_fight',
+    icon: '🥊',
+    title: 'Strong Warning',
+    description: 'Strong warning, preparing to fight',
+    audioFiles: [
+      require('../../audios/for-fight_1.mp3'),
+      require('../../audios/for-fight_2.mp3'),
+    ],
+    categoryId: 'warning',
+  },
 ];

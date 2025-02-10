@@ -106,8 +106,10 @@ export default function TranslatePage() {
 
   const handleEmotionSelect = (emotion: Emotion) => {
     setSelectedEmotion(emotion);
-    if (emotion.audioFile) {
-      playSound(emotion.audioFile);
+    if (emotion.audioFiles && emotion.audioFiles.length > 0) {
+      // 随机选择一个音频文件播放
+      const randomIndex = Math.floor(Math.random() * emotion.audioFiles.length);
+      playSound(emotion.audioFiles[randomIndex]);
     }
   };
 
@@ -253,12 +255,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   gridContainer: {
-    width: '100%',
-    maxWidth: 400,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'flex-start',
+    paddingHorizontal: (windowWidth - (buttonWidth * 3 + GRID_SPACING * 2)) / 2,
     gap: GRID_SPACING,
   },
   emotionButton: {

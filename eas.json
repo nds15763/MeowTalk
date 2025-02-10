@@ -12,9 +12,9 @@
       "distribution": "internal"
     },
     "production": {
-     "android": {
-        "buildType": "app-bundle",
-        "gradleCommand": ":app:bundleRelease",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
         "autoIncrement": true,
         "env": {
           "ENABLE_PROGUARD": "true",
