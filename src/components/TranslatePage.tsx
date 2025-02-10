@@ -201,12 +201,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   backgroundImage: {
-    height: Dimensions.get('window').height,
-    width: Dimensions.get('window').height * (1350/2400),
+    flex: 1,
+    width: '100%',
   },
   backgroundImageStyle: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   container: {
     flex: 1,
@@ -250,22 +251,19 @@ const styles = StyleSheet.create({
   },
   emotionsContainer: {
     flexGrow: 1,
-    alignItems: 'center',
-    paddingHorizontal: 16,
+    width: '100%',
     paddingVertical: 8,
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    paddingHorizontal: (windowWidth - (buttonWidth * 3 + GRID_SPACING * 2)) / 2,
-    gap: GRID_SPACING,
+    justifyContent: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 16,
   },
   emotionButton: {
-    width: `${100/3 - 6}%`,
+    width: (Dimensions.get('window').width - 32 - 16) / 3, // 屏幕宽度减去左右padding和间距
     aspectRatio: 1,
-    marginBottom: GRID_SPACING,
     backgroundColor: '#FFE8E8',
     borderRadius: 12,
     padding: 8,
