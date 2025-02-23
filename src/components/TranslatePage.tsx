@@ -1,5 +1,18 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Dimensions, Platform } from 'react-native';
+/**
+ * TranslatePage 组件
+ * 
+ * 这是一个猫咪情绪翻译页面的主要组件。功能包括：
+ * 1. 展示不同类别的猫咪情绪（通过顶部标签页切换）
+ * 2. 以网格形式展示每个类别下的具体情绪选项
+ * 3. 点击情绪按钮可以播放对应的猫叫声音
+ * 4. 选中情绪后会显示该情绪的详细描述
+ * 
+ * 使用了 React Native 的基础组件和 Expo 的音频功能
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, 
+  Dimensions, AppState, AppStateStatus, ImageBackground, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { emotions, emotionCategories } from '../config/emotions';
@@ -8,51 +21,97 @@ import AudioRecorder from './AudioRecorder';
 import AITranslater from './AITranslater';
 
 const windowWidth = Dimensions.get('window').width;
-const buttonWidth = (windowWidth - 40) / 3;
+const GRID_SPACING = 10;
+const GRID_PADDING = 14;
+const TOTAL_SPACING = (GRID_SPACING * 2) + (GRID_PADDING * 2); // 间距总和
+const buttonWidth = (windowWidth - TOTAL_SPACING) / 3; // 确保一行三个按钮
 
 export default function TranslatePage() {
   const [selectedEmotion, setSelectedEmotion] = useState<Emotion | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<EmotionCategory>(emotionCategories[1]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [audioFeatures, setAudioFeatures] = useState<any>(null);
-  const [translationResult, setTranslationResult] = useState<any>(null);
-  const [detectedEmotion, setDetectedEmotion] = useState<any>(null);
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    // 初始化音频配置
+    const setupAudio = async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+      } catch (error) {
+        console.error('音频初始化失败:', error);
+      }
+    };
+    setupAudio();
+
+    // 监听应用状态变化
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // 组件卸载时清理
+    return () => {
+      subscription.remove();
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, []);
 
   async function playSound(audioFile: any) {
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
-      });
-
+      // 如果有正在播放的音频，先停止并卸载
       if (sound) {
+        await sound.stopAsync();
         await sound.unloadAsync();
       }
 
-      let audioSource = audioFile;
-      if (Platform.OS !== 'web') {
-        if (typeof audioFile === 'string') {
-          if (audioFile.startsWith('http')) {
-            audioSource = { uri: audioFile };
-          } else {
-            audioSource = audioFile;
-          }
-        }
-      }
+      const { sound: newSound } = await Audio.Sound.createAsync(audioFile, {
+        shouldPlay: true,
+        volume: 1.0,
+      });
 
-      const { sound: newSound } = await Audio.Sound.createAsync(audioSource);
+      // 监听播放完成事件
+      newSound.setOnPlaybackStatusUpdate(async (status: any) => {
+        if (status.didJustFinish) {
+          // 播放结束后自动卸载
+          await newSound.unloadAsync();
+          setSound(null);
+        }
+      });
+
       setSound(newSound);
-      await newSound.playAsync();
     } catch (error) {
-      console.error('Error playing sound:', error);
+      console.error('播放音频失败:', error);
     }
   }
 
+  const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+    if (
+      appState.current.match(/active/) && 
+      (nextAppState === 'background' || nextAppState === 'inactive')
+    ) {
+      // 应用进入后台，停止并卸载音频
+      if (sound) {
+        try {
+          await sound.stopAsync();
+          await sound.unloadAsync();
+          setSound(null);
+        } catch (error) {
+          console.error('停止音频失败:', error);
+        }
+      }
+    }
+    appState.current = nextAppState;
+  };
+
   const handleEmotionSelect = (emotion: Emotion) => {
     setSelectedEmotion(emotion);
-    if (emotion.audioFile) {
-      playSound(emotion.audioFile);
+    if (emotion.audioFiles && emotion.audioFiles.length > 0) {
+      // 随机选择一个音频文件播放
+      const randomIndex = Math.floor(Math.random() * emotion.audioFiles.length);
+      playSound(emotion.audioFiles[randomIndex]);
     }
   };
 
@@ -61,144 +120,193 @@ export default function TranslatePage() {
     setSelectedEmotion(null);
   };
 
-  const handleEmotionDetected = (features: any) => {
-    setAudioFeatures(features);
-  };
+  // const handleEmotionDetected = (features: any) => {
+  //   setAudioFeatures(features);
+  // };
 
-  const handleTranslationResult = (result: any) => {
-    setTranslationResult(result);
-    setSelectedCategory(emotionCategories.find(c => c.id === result.emotion.categoryId) || emotionCategories[0]);
-    setSelectedEmotion(result.emotion);
-  };
+  // const handleTranslationResult = (result: any) => {
+  //   setTranslationResult(result);
+  //   setSelectedCategory(emotionCategories.find(c => c.id === result.emotion.categoryId) || emotionCategories[0]);
+  //   setSelectedEmotion(result.emotion);
+  // };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>MeowTalk</Text>
-        <Text style={styles.subHeaderText}>Select Emotion</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.pageContainer}>
+        <ImageBackground 
+          source={require('../../images/transback.png')}
+          style={styles.backgroundImage}
+          imageStyle={styles.backgroundImageStyle}
+        >
+          <View style={styles.container}>
+            <View style={styles.header}>
+            <Image 
+              source={require('../../images/banner.png')}
+              style={styles.headerLogo}
+            />
+              <Text style={styles.subHeaderText}>Click the emotion card to play</Text>
+            </View>
+            <View style={styles.tabContainer}>
+              {emotionCategories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.tabButton,
+                    selectedCategory.id === category.id && styles.selectedTab,
+                  ]}
+                  onPress={() => handleCategorySelect(category)}
+                >
+                  <Text style={styles.tabTitle}>{category.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.scrollViewContainer}>
+              <ScrollView contentContainerStyle={styles.emotionsContainer}>
+                <View style={styles.gridContainer}>
+                  {emotions
+                    .filter((emotion) => emotion.categoryId === selectedCategory.id)
+                    .map((emotion, index) => (
+                      <TouchableOpacity
+                        key={emotion.id}
+                        style={[
+                          styles.emotionButton,
+                          selectedEmotion?.id === emotion.id && styles.selectedEmotion,
+                        ]}
+                        onPress={() => handleEmotionSelect(emotion)}
+                      >
+                        <View style={styles.emotionContent}>
+                          <Text style={styles.emotionIcon}>{emotion.icon}</Text>
+                          <Text style={styles.emotionTitle}>{emotion.title}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              </ScrollView>
+            </View>
+            {selectedEmotion && (
+              <View style={styles.descriptionContainer}>
+                <Text style={styles.descriptionText}>{selectedEmotion.description}</Text>
+              </View>
+            )}
+          </View>
+        </ImageBackground>
       </View>
-
-      {/* 录音和AI翻译组件 */}
-      <AudioRecorder onEmotionDetected={handleEmotionDetected} />
-      <AITranslater 
-        audioFeatures={audioFeatures}
-        onTranslationResult={handleTranslationResult}
-      />
-
-      <View style={styles.tabContainer}>
-        {emotionCategories.map((category) => (
-          <TouchableOpacity
-            key={category.id}
-            style={[
-              styles.tabButton,
-              selectedCategory.id === category.id && styles.selectedTab,
-            ]}
-            onPress={() => handleCategorySelect(category)}
-          >
-            <Text style={styles.tabTitle}>{category.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView contentContainerStyle={styles.emotionsContainer}>
-        {emotions
-          .filter((emotion) => emotion.categoryId === selectedCategory.id)
-          .map((emotion, index) => (
-            <TouchableOpacity
-              key={emotion.id}
-              style={[
-                styles.emotionButton,
-                selectedEmotion?.id === emotion.id && styles.selectedEmotion,
-                { width: buttonWidth, height: buttonWidth },
-                (index + 1) % 3 === 0 ? styles.lastInRow : null,
-              ]}
-              onPress={() => handleEmotionSelect(emotion)}
-            >
-              <Text style={styles.emotionIcon}>{emotion.icon}</Text>
-              <Text style={styles.emotionTitle}>{emotion.title}</Text>
-            </TouchableOpacity>
-          ))}
-      </ScrollView>
-
-      {selectedEmotion && (
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText}>{selectedEmotion.description}</Text>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  headerLogo: {
+    width: 200,  
+    height: 45,
+    resizeMode: 'contain',
+  },
+  safeArea: {
+    flex: 1,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  pageContainer: {
+    flex: 1,
+    alignItems: 'center',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+  },
+  backgroundImageStyle: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   header: {
     alignItems: 'center',
-    padding: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    padding: 15,
   },
   subHeaderText: {
     fontSize: 16,
     color: '#666',
-    marginTop: 5,
+    textAlign: 'center',
   },
   tabContainer: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
     paddingHorizontal: 10,
-    marginBottom: 10,
+    width: '100%',
   },
   tabButton: {
-    flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: '25%',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
   },
   selectedTab: {
-    borderBottomColor: '#ff4081',
+    borderBottomWidth: 2,
+    borderBottomColor: '#EF7C8E',
   },
   tabTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  scrollViewContainer: {
+    flex: 1,
+    width: '100%',
   },
   emotionsContainer: {
+    flexGrow: 1,
+    width: '100%',
+    paddingVertical: 8,
+  },
+  gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 10,
+    justifyContent: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 16,
   },
   emotionButton: {
-    justifyContent: 'center',
+    width: (Dimensions.get('window').width - 32 - 16) / 3, // 屏幕宽度减去左右padding和间距
+    aspectRatio: 1,
+    backgroundColor: '#FFE8E8',
+    borderRadius: 12,
+    padding: 8,
     alignItems: 'center',
-    marginRight: 10,
-    marginBottom: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  emotionContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   selectedEmotion: {
-    backgroundColor: '#ffe0e9',
+    backgroundColor: '#A864AF',
+    transform: [{ scale: 1.05 }],
   },
   emotionIcon: {
     fontSize: 24,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   emotionTitle: {
+    color: '#333',
     fontSize: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   descriptionContainer: {
-    padding: 20,
-    backgroundColor: '#f8f8f8',
+    padding: 15,
+    alignItems: 'center',
   },
   descriptionText: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 14,
     textAlign: 'center',
-  },
-  lastInRow: {
-    marginRight: 0,
   },
 });

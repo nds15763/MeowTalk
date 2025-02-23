@@ -3,6 +3,7 @@
     "name": "MeowTalk",
     "slug": "MeowTalk",
     "version": "1.0.0",
+    "icon": "./images/cat_logo.png",
     "platforms": [
       "ios",
       "android",
@@ -10,12 +11,9 @@
     ],
     "icon": "./images/icon.png",
     "splash": {
-      "image": "./images/splash.png",
+      "image": "./images/cat_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
-    },
-    "web": {
-      "favicon": "./images/favicon.png"
     },
     "extra": {
       "eas": {
@@ -24,10 +22,16 @@
     },
     "android": {
       "package": "com.xyakim.MeowTalk",
-      "permissions": ["MODIFY_AUDIO_SETTINGS"]
+      "navigationBarColor": "#EF7C8E",
+      "adaptiveIcon": {
+        "foregroundImage": "./images/cat_logo.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "ios": {
-      "bundleIdentifier": "com.xyakim.MeowTalk"
+      "bundleIdentifier": "com.xyakim.MeowTalk",
+      "buildNumber": "1",
+      "navigationBarColor": "#EF7C8E"
     }
   }
 }
