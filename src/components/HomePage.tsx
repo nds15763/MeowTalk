@@ -34,6 +34,13 @@ export default function HomePage() {
             >
               <Text style={styles.buttonText}>Translate</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.testButton]}
+              onPress={() => navigation.navigate('TestAudio' as never)}
+            >
+              <Text style={styles.buttonText}>Test Audio</Text>
+            </TouchableOpacity>
           </View>
         </ImageBackground>
       </View>
@@ -92,6 +99,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Platform.OS === 'android' ? 35 : 40,
     paddingVertical: Platform.OS === 'android' ? 12 : 15,
     borderRadius: 25,
+  },
+  testButton: {
+    marginTop: 10,
+    backgroundColor: '#7B6CF6',  // 使用不同的颜色区分测试按钮
   },
   buttonText: {
     color: '#fff',

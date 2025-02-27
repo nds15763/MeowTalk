@@ -51,26 +51,43 @@ func (m *MockAudioProcessor) ProcessAudio(data []float64) ([]byte, error) {
 
 // StartMockServer 启动mock服务器
 func (m *MockAudioProcessor) StartMockServer(port int) error {
-	// 初始化路由
+	// 初始化处理器
 	http.HandleFunc("/init", m.handleInit)
 	http.HandleFunc("/start", m.handleStart)
 	http.HandleFunc("/send", m.handleSend)
 	http.HandleFunc("/recv", m.handleReceive)
 	http.HandleFunc("/stop", m.handleStop)
 
+	// 添加CORS中间件
+	handler := corsMiddleware(http.DefaultServeMux)
+
 	// 启动服务器
 	addr := fmt.Sprintf(":%d", port)
-	log.Printf("Mock server starting on http://localhost%s", addr)
-	return http.ListenAndServe(addr, nil)
+	log.Printf("Mock服务器启动在 http://localhost%s\n", addr)
+	return http.ListenAndServe(addr, handler)
+}
+
+// CORS中间件
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 设置CORS头
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+		// 处理预检请求
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// 继续处理实际请求
+		next.ServeHTTP(w, r)
+	})
 }
 
 // HTTP处理函数
 func (m *MockAudioProcessor) handleInit(w http.ResponseWriter, r *http.Request) {
-	// 设置CORS头部
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-
 	// 处理OPTIONS预检请求
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -89,12 +106,6 @@ func (m *MockAudioProcessor) handleInit(w http.ResponseWriter, r *http.Request) 
 }
 
 func (m *MockAudioProcessor) handleStart(w http.ResponseWriter, r *http.Request) {
-	// 设置CORS头部
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-	w.Header().Set("Content-Type", "application/json")
-
 	// 处理OPTIONS预检请求
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -132,12 +143,6 @@ func (m *MockAudioProcessor) handleStart(w http.ResponseWriter, r *http.Request)
 }
 
 func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) {
-	// 设置CORS头部
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-	w.Header().Set("Content-Type", "application/json")
-
 	// 处理OPTIONS预检请求
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -154,7 +159,7 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("收到音频数据 - StreamID: %s, 长度: %d\n", req.StreamID, len(req.Data))
 	// 处理音频数据
 	result, err := m.ProcessAudio(req.Data)
 	if err != nil {
@@ -171,12 +176,6 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 }
 
 func (m *MockAudioProcessor) handleReceive(w http.ResponseWriter, r *http.Request) {
-	// 设置CORS头部
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-	w.Header().Set("Content-Type", "application/json")
-
 	// 处理OPTIONS预检请求
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -195,7 +194,8 @@ func (m *MockAudioProcessor) handleReceive(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("发送处理情感数据 - StreamID: %s\n", req.StreamID)
+	// 处理音频数据
 	session, ok := m.sessions.Load(req.StreamID)
 	if !ok {
 		http.Error(w, "Session not found", http.StatusNotFound)
@@ -218,12 +218,6 @@ func (m *MockAudioProcessor) handleReceive(w http.ResponseWriter, r *http.Reques
 }
 
 func (m *MockAudioProcessor) handleStop(w http.ResponseWriter, r *http.Request) {
-	// 设置CORS头部
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
-	w.Header().Set("Content-Type", "application/json")
-
 	// 处理OPTIONS预检请求
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
