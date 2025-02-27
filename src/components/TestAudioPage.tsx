@@ -98,7 +98,7 @@ export default function TestAudioPage() {
       }
 
       setIsRecording(true);
-      addLog('开始录音\n');
+      addLog('开始录音');
 
       // 开始轮询结果
       pollIntervalRef.current = setInterval(pollResult, 1000);
@@ -128,7 +128,7 @@ export default function TestAudioPage() {
       }
 
       setIsRecording(false);
-      addLog('停止录音\n');
+      addLog('停止录音');
 
       // 停止轮询
       if (pollIntervalRef.current) {
@@ -143,9 +143,24 @@ export default function TestAudioPage() {
   // 处理音频数据
   const handleAudioData = useCallback((data: any) => {
     if (!isRecording) return;
-    addLog(`收到音频数据: ${data.audioData} \n`);
-    sendAudioData(data.audioData);
-  }, [isRecording, sendAudioData]);
+    
+    // 确保音频数据存在且有效
+    if (data && data.audioData && Array.isArray(data.audioData) && data.audioData.length > 0) {
+      // 计算一些简单的统计信息
+      const maxValue = Math.max(...data.audioData);
+      const minValue = Math.min(...data.audioData);
+      const avgValue = data.audioData.reduce((a: number, b: number) => a + b, 0) / data.audioData.length;
+      
+      // 添加日志 - 打印音频数据统计信息
+      addLog(`音频数据: [样本数=${data.audioData.length}, 最小值=${minValue}, 最大值=${maxValue.toFixed(2)}, 平均值=${avgValue.toFixed(2)}]`);
+      
+      // 发送到服务器 - 确保发送的是数字数组
+      const numericData = data.audioData.map((val: any) => Number(val));
+      if (numericData.some((val: number) => !isNaN(val))) {
+        sendAudioData(numericData);
+      }
+    }
+  }, [isRecording, sendAudioData, addLog]);
 
   // 组件卸载时清理
   useEffect(() => {
@@ -208,26 +223,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   infoContainer: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
     marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
   },
   infoText: {
     fontSize: 16,
-    marginBottom: 8,
+    marginBottom: 5,
   },
   logsContainer: {
     flex: 1,
-    backgroundColor: 'white',
-    padding: 10,
+    backgroundColor: '#f9f9f9',
+    padding: 15,
     borderRadius: 10,
   },
   title: {
     fontSize: 18,
+    fontWeight: 'bold',
     marginBottom: 10,
   },
   logs: {
@@ -235,6 +250,7 @@ const styles = StyleSheet.create({
   },
   logText: {
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 2,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : 'courier',
   },
 });

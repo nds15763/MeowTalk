@@ -15,6 +15,10 @@ export default function AudioRecorder({ onAudioData, onRecordingStart, onRecordi
   const audioRecorderRef = useRef<RNAudioRecorderPlayer>();
   const mediaRecorderRef = useRef<MediaRecorder>();
   const mediaStreamRef = useRef<MediaStream>();
+  const audioContextRef = useRef<AudioContext>();
+  const audioAnalyserRef = useRef<AnalyserNode>();
+  const dataArrayRef = useRef<Uint8Array>();
+  const animationFrameRef = useRef<number>();
   const startTimeRef = useRef<number>(0);
 
   // Web平台的录音实现
@@ -26,21 +30,79 @@ export default function AudioRecorder({ onAudioData, onRecordingStart, onRecordi
       // 先通知父组件开始录音
       await onRecordingStart?.();
       
+      // 创建AudioContext和分析器
+      if (isWeb) {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = audioContext;
+        
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        audioAnalyserRef.current = analyser;
+        
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        dataArrayRef.current = new Uint8Array(bufferLength);
+        
+        // 开始周期性获取音频数据
+        const getAudioData = () => {
+          if (!audioAnalyserRef.current || !dataArrayRef.current) return;
+          
+          // 获取音频频域数据
+          audioAnalyserRef.current.getByteFrequencyData(dataArrayRef.current);
+          
+          // 将数据简化为数值，确保发送的是数字而不是Uint8Array
+          const reducedData = Array.from(dataArrayRef.current)
+            .filter((_, index) => index % 10 === 0)
+            .map(val => Number(val)); // 确保是数字类型
+          
+          // 只有当存在有效数据时才发送
+          if (reducedData.some(val => val > 0)) {
+            onLog?.(`捕获到音频数据: ${reducedData.length} 个采样点`);
+            onAudioData?.({
+              audioData: reducedData
+            });
+          }
+          
+          // 继续下一帧
+          animationFrameRef.current = requestAnimationFrame(getAudioData);
+        };
+        
+        // 开始获取数据
+        animationFrameRef.current = requestAnimationFrame(getAudioData);
+      }
+
+      // 同时使用MediaRecorder作为备份
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       startTimeRef.current = Date.now();
 
       mediaRecorder.ondataavailable = async (e) => {
+        // MediaRecorder数据主要用于录音保存，不作为实时显示
         const audioBlob = new Blob([e.data], { type: 'audio/webm' });
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-        
-        onAudioData?.({
-          audioData: Array.from(uint8Array)
-        });
+        onLog?.(`MediaRecorder捕获到数据块: ${Math.round(audioBlob.size / 1024)}KB`);
+
+        try {
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          // 转换为数字数组，每100个采样点取一个，避免数据量太大
+          const audioData = Array.from(uint8Array)
+            .filter((_, index) => index % 100 === 0)
+            .map(val => Number(val));
+          
+          if (audioData.length > 0) {
+            onAudioData?.({
+              audioData: audioData
+            });
+          }
+        } catch (error) {
+          onLog?.(`处理MediaRecorder数据失败: ${error}`);
+        }
       };
 
-      mediaRecorder.start(100); // 每100ms触发一次数据
+      mediaRecorder.start(1000); // 每1秒触发一次数据
+      onLog?.('开始捕获音频数据...');
     } catch (error) {
       onLog?.(`启动录音失败: ${error}`);
     }
@@ -48,13 +110,30 @@ export default function AudioRecorder({ onAudioData, onRecordingStart, onRecordi
 
   const stopWebRecording = () => {
     try {
+      // 停止动画帧
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = undefined;
+      }
+      
+      // 关闭音频上下文
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = undefined;
+      }
+      
+      // 停止MediaRecorder
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop();
       }
+      
+      // 停止媒体流
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
       }
+      
       onRecordingStop?.();
+      onLog?.('停止捕获音频数据');
     } catch (error) {
       onLog?.(`停止录音失败: ${error}`);
     }
@@ -72,10 +151,18 @@ export default function AudioRecorder({ onAudioData, onRecordingStart, onRecordi
 
       await audioRecorderRef.current.startRecorder();
       audioRecorderRef.current.addRecordBackListener((data) => {
+        // 将音频数据发送给父组件
+        const audioData = data.currentPosition ? [data.currentPosition] : [];
+        if (data.currentMetering) {
+          audioData.push(data.currentMetering);
+        }
+        
         onAudioData?.({
-          audioData: data.currentMetering ? [data.currentMetering] : []
+          audioData: audioData
         });
       });
+      
+      onLog?.('开始捕获音频数据...');
     } catch (error) {
       onLog?.(`启动录音失败: ${error}`);
     }
@@ -88,6 +175,7 @@ export default function AudioRecorder({ onAudioData, onRecordingStart, onRecordi
         audioRecorderRef.current.removeRecordBackListener();
       }
       onRecordingStop?.();
+      onLog?.('停止捕获音频数据');
     } catch (error) {
       onLog?.(`停止录音失败: ${error}`);
     }
