@@ -80,33 +80,18 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 		return nil, fmt.Errorf("音频数据为空")
 	}
 
-	// 添加数据到缓冲区
-	m.bufferMutex.Lock()
-
-	// 保存原始缓冲区大小，用于计算新增数据比例
-	originalSize := len(m.audioBuffer)
-
-	// 添加新数据
+	// 确保外部数据添加到缓冲区
+	m.mu.Lock()
 	m.audioBuffer = append(m.audioBuffer, data...)
-
-	// 计算当前缓冲区时长（秒）
 	bufferDuration := float64(len(m.audioBuffer)) / float64(m.sampleRate)
-	log.Printf("当前缓冲区长度: %.2f秒 (%d样本)", bufferDuration, len(m.audioBuffer))
+	log.Printf("音频缓冲区：当前长度=%d 样本, 持续时间=%.2f秒", len(m.audioBuffer), bufferDuration)
+	m.mu.Unlock()
 
-	// 计算这次添加的数据占比
-	newDataRatio := 0.0
-	if originalSize > 0 {
-		newDataRatio = float64(len(data)) / float64(originalSize)
-	} else {
-		newDataRatio = 1.0 // 如果原来为空，则全是新数据
-	}
-
-	// 检查缓冲区是否可以处理
-	processBuffer := false
+	var processBuffer bool
 	var processingData []float64
 
 	// 检查是否有足够长的静默段
-	silenceDetected, silencePos := m.detectSilence()
+	segments, silenceDetected := m.detectSilence(m.audioBuffer)
 
 	timeElapsed := time.Since(m.lastProcessTime).Seconds()
 
@@ -117,48 +102,46 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 	// 4. 会话结束前强制处理（由handleStop单独处理）
 
 	if silenceDetected && bufferDuration >= 0.5 {
-		log.Printf("检测到静默，位置: %d (%.2f秒处)", silencePos, float64(silencePos)/float64(m.sampleRate))
-		// 只处理到静默开始的部分
-		processingData = make([]float64, silencePos)
-		copy(processingData, m.audioBuffer[:silencePos])
+		log.Printf("检测到静默，处理前%d个音频样本", len(m.audioBuffer)-len(segments[len(segments)-1]))
+		// 只处理到静默开始的部分（即所有非最后一个片段的数据）
+		totalLength := len(m.audioBuffer) - len(segments[len(segments)-1])
+		processingData = make([]float64, totalLength)
+		copy(processingData, m.audioBuffer[:totalLength])
 		// 保留静默后的部分到缓冲区
-		remaining := make([]float64, len(m.audioBuffer)-silencePos)
-		copy(remaining, m.audioBuffer[silencePos:])
-		m.audioBuffer = remaining
+		m.audioBuffer = m.audioBuffer[totalLength:]
 		processBuffer = true
 	} else if bufferDuration >= m.maxBufferTime {
-		log.Printf("缓冲区达到最大时间 (%.2f秒)，开始处理", bufferDuration)
+		// 缓冲区太长，需要处理
+		log.Printf("缓冲区达到最大时间 (%.2f秒)，处理数据", bufferDuration)
 		processingData = make([]float64, len(m.audioBuffer))
 		copy(processingData, m.audioBuffer)
-		m.audioBuffer = nil
+		m.audioBuffer = m.audioBuffer[:0]
 		processBuffer = true
-	} else if bufferDuration >= m.minProcessTime && timeElapsed > 0.5 {
-		log.Printf("缓冲区达到最小处理时间(%.2f秒)，且距上次处理已超过0.5秒，开始处理", bufferDuration)
+	} else if bufferDuration >= m.minProcessTime && timeElapsed >= 0.5 {
+		// 超过最小处理时间，且自上次处理已经过去了足够长的时间
+		log.Printf("达到最小处理时间 (%.2f秒) 且间隔足够长 (%.2f秒), 处理数据",
+			bufferDuration, timeElapsed)
 		processingData = make([]float64, len(m.audioBuffer))
 		copy(processingData, m.audioBuffer)
-		m.audioBuffer = nil
-		processBuffer = true
-	} else if len(data) > 5000 && newDataRatio < 0.1 && bufferDuration > 0.75 {
-		// 如果新数据很小但以前积累了不少数据，说明可能是流的结束
-		log.Printf("检测到数据流速率下降（新数据比例%.2f%%），可能接近结束", newDataRatio*100)
-		processingData = make([]float64, len(m.audioBuffer))
-		copy(processingData, m.audioBuffer)
-		m.audioBuffer = nil
+		m.audioBuffer = m.audioBuffer[:0]
 		processBuffer = true
 	}
 
-	m.bufferMutex.Unlock()
+	m.mu.Lock()
+	m.buffer = m.buffer[:0]
+	m.lastProcessTime = time.Now()
+	m.mu.Unlock()
 
 	// 如果不需要处理，返回空结果
 	if !processBuffer {
+		log.Println("缓冲区不需要处理，跳过")
 		return nil, nil
 	}
 
-	// 更新最后处理时间
-	m.lastProcessTime = time.Now()
+	log.Printf("开始处理音频: 处理数据长度=%d", len(processingData))
 
 	// 处理音频数据
-	return m.processBuffer(streamID)
+	return m.processBuffer(streamID, processingData)
 }
 
 // detectSilence 检测缓冲区中的静默段
@@ -175,8 +158,7 @@ func (m *MockAudioProcessor) detectSilence(data []float64) ([][]float64, bool) {
 		silenceWindow = 100
 	}
 
-	silenceCount := 0
-	silenceStart := 0
+	silenceCount := 0.0
 	segments := [][]float64{}
 	currentSegment := []float64{}
 	inSilence := false
@@ -209,10 +191,7 @@ func (m *MockAudioProcessor) detectSilence(data []float64) ([][]float64, bool) {
 				currentSegment = []float64{}
 			}
 
-			if silenceCount == 0 {
-				silenceStart = i
-			}
-			silenceCount += silenceWindow / 2
+			silenceCount += float64(silenceWindow) / 2
 
 			// 检查静默是否达到最小时间
 			silenceDuration := float64(silenceCount) / float64(m.sampleRate)
@@ -241,7 +220,7 @@ func (m *MockAudioProcessor) detectSilence(data []float64) ([][]float64, bool) {
 			// 不要立即重置计数器，而是容忍一些短暂噪声
 			if silenceCount > 0 && energy < actualThreshold*2 {
 				// 噪声不是太大，继续累积静默
-				silenceCount += silenceWindow / 2
+				silenceCount += float64(silenceWindow) / 2
 			} else {
 				silenceCount = 0
 			}
@@ -257,19 +236,13 @@ func (m *MockAudioProcessor) detectSilence(data []float64) ([][]float64, bool) {
 }
 
 // processBuffer 处理缓冲区中的音频数据
-func (m *MockAudioProcessor) processBuffer(streamID string) ([]byte, error) {
-	m.mu.Lock()
-	data := m.buffer
-	m.buffer = m.buffer[:0]
-	m.lastProcessTime = time.Now()
-	m.mu.Unlock()
-
+func (m *MockAudioProcessor) processBuffer(streamID string, data []float64) ([]byte, error) {
 	if len(data) == 0 {
 		return []byte(`{"status":"empty"}`), nil
 	}
 
 	// 检测静默并处理音频
-	segments, hasSilence := m.detectSilence(data)
+	segments, _ := m.detectSilence(data)
 	if len(segments) == 0 {
 		return []byte(`{"status":"no_cat_sound"}`), nil
 	}
@@ -284,8 +257,15 @@ func (m *MockAudioProcessor) processBuffer(streamID string) ([]byte, error) {
 		}
 	}
 
+	log.Printf("处理音频片段: 片段长度=%d, 片段数量=%d, 最长片段长度=%d",
+		len(data), len(segments), len(longestSegment))
+
 	// 处理音频片段
 	windowResults, result := m.processAudioSegment(streamID, longestSegment)
+
+	// 打印分析结果
+	log.Printf(" 分析结果: 情感=%s, 置信度=%.2f, 窗口数=%d",
+		result.Emotion, result.Confidence, len(windowResults))
 
 	// 保存处理音频数据
 	if result.Confidence > 0.5 {
@@ -294,19 +274,6 @@ func (m *MockAudioProcessor) processBuffer(streamID string) ([]byte, error) {
 	}
 
 	return json.Marshal(result)
-}
-
-// AudioFeature 包含音频的详细特征分析
-type AudioFeature struct {
-	ZeroCrossRate    float64 // 过零率
-	Energy           float64 // 能量
-	Entropy          float64 // 熵
-	SpectralCentroid float64 // 频谱质心
-	SpectralFlux     float64 // 频谱流量
-	SpectralRolloff  float64 // 频谱滚降
-	Pitch            float64 // 音高
-	FundamentalFreq  float64 // 基频
-	Duration         float64 // 持续时间(秒)
 }
 
 // AudioFeatures 简化的音频特征，用于情感识别
@@ -319,7 +286,7 @@ type AudioFeatures struct {
 // 从窗口结果集中提取最终特征
 func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 	if len(windowResults) == 0 {
-		return AudioFeatures{} // 如果没有窗口结果，返回空特征
+		return AudioFeatures{}
 	}
 
 	// 查找最大能量和平均音高
@@ -362,13 +329,8 @@ func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 func extractAudioFeatures(data []float64) AudioFeature {
 	var features AudioFeature
 
-	// 如果数据为空，返回空特征
-	if len(data) == 0 {
-		return features
-	}
-
 	// 计算持续时间（秒）
-	features.Duration = float64(len(data)) / float64(44100) // 假设采样率为44.1kHz
+	features.Duration = float64(len(data)) / 44100.0 // 假设采样率为44.1kHz
 
 	// 计算过零率
 	features.ZeroCrossRate = calculateZeroCrossRate(data)
@@ -376,21 +338,31 @@ func extractAudioFeatures(data []float64) AudioFeature {
 	// 计算能量
 	features.Energy = calculateEnergy(data)
 
-	// 计算音高
-	features.Pitch = estimatePitch(data, 44100) // 假设采样率为44.1kHz
+	// 计算均方根值
+	features.RootMeanSquare = math.Sqrt(features.Energy)
 
-	// 计算频谱特征
-	spectrum := calculateSpectrum(data)
+	// 计算峰值频率
+	features.PeakFreq = calculatePeakFrequency(data, 44100)
+
+	// 计算频谱
+	spectrum := performFFT(data)
+
+	// 计算频谱质心
 	features.SpectralCentroid = calculateSpectralCentroid(spectrum)
-	features.SpectralFlux = 0.0 // 需要前一帧进行计算，这里简化
+
+	// 计算频谱滚降点
 	features.SpectralRolloff = calculateSpectralRolloff(spectrum)
 
-	// 基频（简化为与音高相同）
-	features.FundamentalFreq = features.Pitch
+	// 计算基频
+	features.FundamentalFreq = estimateFundamentalFrequency(data)
+
+	// 估计音高
+	features.Pitch = estimatePitch(data, 44100)
 
 	// 记录提取的特征数据
-	log.Printf("提取的音频特征: 能量=%.2f, 音高=%.2f, 持续时间=%.2fs, ZCR=%.2f, 频谱质心=%.2f",
-		features.Energy, features.Pitch, features.Duration, features.ZeroCrossRate, features.SpectralCentroid)
+	log.Printf("音频特征: 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2fs, ZCR=%.2f, 峰值频率=%.2f, 频谱质心=%.2f",
+		features.Energy, features.Pitch, features.Duration, features.ZeroCrossRate,
+		features.PeakFreq, features.SpectralCentroid)
 
 	return features
 }
@@ -424,59 +396,6 @@ func calculatePeakFrequency(data []float64, sampleRate int) float64 {
 
 	// 转换为频率
 	return float64(peakBin) * float64(sampleRate) / float64(len(fft))
-}
-
-// calculateSpectralCentroid 计算频谱质心
-func calculateSpectralCentroid(data []float64) float64 {
-	fft := performFFT(data)
-
-	var weightedSum float64
-	var magnitudeSum float64
-
-	// 只使用前半部分频谱
-	for i := 0; i < len(fft)/2; i++ {
-		magnitude := cmplx.Abs(fft[i])
-		frequency := float64(i) * 44100.0 / float64(len(fft))
-
-		weightedSum += magnitude * frequency
-		magnitudeSum += magnitude
-	}
-
-	if magnitudeSum == 0 {
-		return 0
-	}
-
-	return weightedSum / magnitudeSum
-}
-
-// calculateSpectralRolloff 计算频谱滚降点（85%能量点）
-func calculateSpectralRolloff(data []float64) float64 {
-	fft := performFFT(data)
-
-	// 计算总能量
-	totalEnergy := 0.0
-	for i := 0; i < len(fft)/2; i++ {
-		magnitude := cmplx.Abs(fft[i])
-		totalEnergy += magnitude
-	}
-
-	// 寻找85%能量点
-	threshold := totalEnergy * 0.85
-	currentEnergy := 0.0
-	rolloffIndex := 0
-
-	for i := 0; i < len(fft)/2; i++ {
-		magnitude := cmplx.Abs(fft[i])
-		currentEnergy += magnitude
-
-		if currentEnergy >= threshold {
-			rolloffIndex = i
-			break
-		}
-	}
-
-	// 转换为频率
-	return float64(rolloffIndex) * 44100.0 / float64(len(fft))
 }
 
 // estimateFundamentalFrequency 估计基频
@@ -749,61 +668,46 @@ func min(a, b float64) float64 {
 	return b
 }
 
-// analyzeEmotionWithAI 使用AI分析情感
-func analyzeEmotionWithAI(audioData []float64, features AudioFeatures) (string, float64) {
-	// 这里应该调用真实的AI模型API
-	// 目前仅添加模拟行为
-
-	log.Printf("执行AI情感分析，输入特征: 能量=%.2f, 音高=%.2f, 持续时间=%.2f",
-		features.Energy, features.Pitch, features.Duration)
-
-	// 基于输入特征添加随机性，但保持一定相关性
-	// 使用 golang.org/x/exp/rand 包
-	source := rand.NewSource(uint64(time.Now().UnixNano()))
-	rng := rand.New(source)
-	randomFactor := 0.1 + 0.2*rng.Float64() // 10-30%的随机因素
-
-	var aiEmotion string
-
-	// 添加一些随机性，但基于输入特征
-	// 高能量通常与兴奋或生气相关
-	if features.Energy > 0.7 {
-		if features.Pitch > 600 {
-			aiEmotion = "angry"
-		} else {
-			aiEmotion = "excited"
-		}
-	} else if features.Energy > 0.5 {
-		if features.Pitch > 500 {
-			aiEmotion = "happy"
-		} else {
-			aiEmotion = "curious"
-		}
-	} else if features.Energy > 0.3 {
-		if features.Pitch > 400 {
-			aiEmotion = "contented"
-		} else {
-			aiEmotion = "affectionate"
-		}
-	} else {
-		if features.Duration > 0.7 {
-			aiEmotion = "sad"
-		} else {
-			aiEmotion = "sleepy"
-		}
+// analyzeEmotionWithAI 使用AI分析猫咪的情感
+func (m *MockAudioProcessor) analyzeEmotionWithAI(features []AudioFeature) (string, float64) {
+	if len(features) == 0 {
+		return "unknown", 0.0
 	}
 
-	// 计算基础置信度（0.7-0.95之间）然后添加随机因素
-	baseConfidence := 0.7 + 0.25*(1.0-randomFactor)
+	// 使用golang.org/x/exp/rand代替math/rand
+	emotions := []string{"happy", "sad", "angry", "friendly", "scared", "territorial"}
 
-	// 小概率随机返回不同情感，模拟AI的不确定性
-	if rng.Float64() < 0.15 {
-		emotionList := []string{"angry", "happy", "excited", "curious", "contented", "sad", "sleepy", "affectionate"}
-		aiEmotion = emotionList[rng.Intn(len(emotionList))]
-		baseConfidence = 0.7 + 0.15*rng.Float64() // 较低置信度
+	// 计算加权平均特征
+	avgEnergy := 0.0
+	avgPitch := 0.0
+	avgZCR := 0.0
+	avgDuration := 0.0
+
+	for _, f := range features {
+		avgEnergy += f.Energy
+		avgPitch += f.Pitch
+		avgZCR += f.ZeroCrossRate
+		avgDuration += f.Duration
 	}
 
-	aiConfidence := baseConfidence
+	avgEnergy /= float64(len(features))
+	avgPitch /= float64(len(features))
+	avgZCR /= float64(len(features))
+	avgDuration /= float64(len(features))
+
+	// 打印数据用于调试
+	log.Printf("AI分析: 平均能量=%.2f, 平均音高=%.2f Hz, 平均过零率=%.2f, 平均持续时间=%.2fs",
+		avgEnergy, avgPitch, avgZCR, avgDuration)
+
+	// 生成种子
+	seed := int64(avgEnergy*1000 + avgPitch + avgZCR*100)
+	src := rand.NewSource(uint64(seed))
+	rng := rand.New(src)
+
+	// 生成随机情感
+	aiEmotion := emotions[rng.Intn(len(emotions))]
+	aiConfidence := 0.7 + 0.2*rng.Float64()
+
 	log.Printf("AI分析结果: 情感=%s, 置信度=%.2f", aiEmotion, aiConfidence)
 
 	return aiEmotion, aiConfidence
@@ -1100,7 +1004,7 @@ func (m *MockAudioProcessor) handleStop(w http.ResponseWriter, r *http.Request) 
 		m.bufferMutex.Unlock()
 
 		// 处理最后的音频数据
-		finalResult, _ = m.processBuffer(req.StreamID)
+		finalResult, _ = m.processBuffer(req.StreamID, audioData)
 
 		// 存储最终结果
 		if finalResult != nil && len(finalResult) > 0 {
@@ -1216,22 +1120,15 @@ func (m *MockAudioProcessor) handleWebSocket(w http.ResponseWriter, r *http.Requ
 
 // processAudioSegment 处理单个音频片段
 func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64) ([]AudioFeature, AnalysisResult) {
-	// 计算音频时长
-	durationSec := float64(len(data)) / float64(m.sampleRate)
-	log.Printf("处理音频片段: %.2f秒", durationSec)
+	log.Printf("开始音频片段处理: 长度=%d", len(data))
 
-	// 如果音频片段太短，跳过处理
-	if durationSec < 0.1 {
-		log.Println("音频片段太短，跳过处理")
-		return nil, AnalysisResult{
-			Status:     "too_short",
-			Emotion:    "unknown",
-			Confidence: 0,
-		}
+	if len(data) == 0 {
+		return nil, AnalysisResult{Status: "empty"}
 	}
 
-	// 计算窗口大小和步进
-	windowSize := int(0.25 * float64(m.sampleRate)) // 使用250ms窗口
+	// 窗口大小（250毫秒）和滑动大小（125毫秒，50%重叠）
+	windowSize := int(0.25 * float64(m.sampleRate)) // 250毫秒
+	// slideSize := windowSize / 2                     // 50%重叠
 	if windowSize > len(data) {
 		windowSize = len(data)
 	}
@@ -1247,7 +1144,7 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 
 	// 记录窗口分析
 	log.Printf("音频分析 [%s]: 总长度 %.2f秒, 使用 %d 个 %d毫秒窗口, 重叠率 50%%",
-		streamID, durationSec, windowCount, windowSize*1000/m.sampleRate)
+		streamID, float64(len(data))/float64(m.sampleRate), windowCount, windowSize*1000/m.sampleRate)
 
 	// 对多个窗口进行分析
 	energyMax := 0.0
@@ -1310,7 +1207,7 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 		// 获取原始音频数据
 		audioData := data
 		if len(audioData) > 0 {
-			aiEmotion, aiConfidence := analyzeEmotionWithAI(audioData, finalFeatures)
+			aiEmotion, aiConfidence := m.analyzeEmotionWithAI(windowResults)
 
 			// 如果AI分析置信度更高，则采用AI结果
 			if aiConfidence > confidence {

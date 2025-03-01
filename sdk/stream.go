@@ -218,7 +218,7 @@ func RecvMessage(streamId string) ([]byte, error) {
 func processBuffer(session *AudioStreamSession) ([]byte, error) {
 	if debugMode && mockProcessor != nil {
 		// 在调试模式下使用mock处理器
-		return mockProcessor.ProcessAudio(session.Buffer)
+		return mockProcessor.ProcessAudio(session.ID, session.Buffer)
 	}
 
 	if len(session.Buffer) < sdk.Config.BufferSize {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 )
@@ -23,19 +22,19 @@ func main() {
 
 	// 设置HTTP路由
 	mux := http.NewServeMux()
-	
+
 	// 设置CORS中间件
 	corsMiddleware := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, Authorization")
-			
+
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-			
+
 			h.ServeHTTP(w, r)
 		})
 	}
@@ -134,20 +133,20 @@ fetch('/api/send', {
 	})
 
 	// 音频处理API
-	mux.HandleFunc("/api/send", processor.HandleSend)
-	
+	mux.HandleFunc("/api/send", processor.handleSend)
+
 	// WebSocket端点
-	mux.HandleFunc("/ws", processor.HandleWebSocket)
+	mux.HandleFunc("/ws", processor.handleWebSocket)
 
 	// 将应用包装在CORS中间件中
 	handler := corsMiddleware(mux)
 
 	// 启动服务器
-	log.Println("正在启动HTTP服务器，监听端口: 8080...")
-	log.Println("API端点: http://localhost:8080/api/send")
-	log.Println("WebSocket端点: ws://localhost:8080/ws")
-	
-	err := http.ListenAndServe(":8080", handler)
+	log.Println("正在启动HTTP服务器，监听端口: 8081...")
+	log.Println("API端点: http://localhost:8081/api/send")
+	log.Println("WebSocket端点: ws://localhost:8081/ws")
+
+	err := http.ListenAndServe(":8081", handler)
 	if err != nil {
 		log.Fatalf("服务器启动失败: %v", err)
 	}
