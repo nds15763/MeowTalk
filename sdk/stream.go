@@ -225,19 +225,22 @@ func processBuffer(session *AudioStreamSession) ([]byte, error) {
 		return nil, fmt.Errorf("buffer size too small: %d < %d", len(session.Buffer), sdk.Config.BufferSize)
 	}
 
-	// 1. 提取特征
+	// 1. 应用汉明窗
+	windowedSamples := applyHammingWindow(session.Buffer[:sdk.Config.BufferSize])
+
+	// 2. 提取特征
 	rawFeatures := session.FeatureExtractor.Extract(&AudioData{
-		Samples:    session.Buffer[:sdk.Config.BufferSize],
+		Samples:    windowedSamples,
 		SampleRate: sdk.Config.SampleRate,
 	})
 
-	// 2. 转换为AudioFeature结构
+	// 3. 转换为AudioFeature结构
 	feature := MapToAudioFeature(rawFeatures)
 
-	// 3. 使用样本库进行匹配
+	// 4. 使用样本库进行匹配
 	emotion, confidence := sdk.Processor.Library.Match(feature)
 
-	// 4. 构造结果
+	// 5. 构造结果
 	result := AudioStreamResult{
 		StreamID:   session.ID,
 		Timestamp:  time.Now().Unix(),
@@ -249,13 +252,13 @@ func processBuffer(session *AudioStreamSession) ([]byte, error) {
 		},
 	}
 
-	// 5. 序列化结果
+	// 6. 序列化结果
 	data, err := json.Marshal(result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal result: %v", err)
 	}
 
-	// 6. 更新缓冲区（保留未处理的数据）
+	// 7. 更新缓冲区（保留未处理的数据）
 	session.Buffer = session.Buffer[sdk.Config.BufferSize:]
 
 	return data, nil

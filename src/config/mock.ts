@@ -8,7 +8,7 @@ export const MOCK_CONFIG = {
   
   // Mock 服务器配置
   SERVER: {
-    URL: 'http://localhost:8080',
+    URL: 'http://localhost:8081',
     ENDPOINTS: {
       INIT: '/init',
       START: '/start',
