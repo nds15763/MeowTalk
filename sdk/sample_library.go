@@ -134,7 +134,7 @@ func (sl *SampleLibrary) Match(feature AudioFeature) (string, float64) {
 // SaveToFile 保存样本库到文件
 func (sl *SampleLibrary) SaveToFile(filename string) error {
 	sl.updateStatistics() // 确保统计信息是最新的
-	
+
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -161,14 +161,14 @@ func (sl *SampleLibrary) LoadFromFile(filename string) error {
 func calculateEuclideanDistance(f1, f2 AudioFeature) float64 {
 	return math.Sqrt(
 		math.Pow(f1.ZeroCrossRate-f2.ZeroCrossRate, 2) +
-		math.Pow(f1.Energy-f2.Energy, 2) +
-		math.Pow(f1.Pitch-f2.Pitch, 2) +
-		math.Pow(f1.Duration-f2.Duration, 2) +
-		math.Pow(f1.PeakFreq-f2.PeakFreq, 2) +
-		math.Pow(f1.RootMeanSquare-f2.RootMeanSquare, 2) +
-		math.Pow(f1.SpectralCentroid-f2.SpectralCentroid, 2) +
-		math.Pow(f1.SpectralRolloff-f2.SpectralRolloff, 2) +
-		math.Pow(f1.FundamentalFreq-f2.FundamentalFreq, 2),
+			math.Pow(f1.Energy-f2.Energy, 2) +
+			math.Pow(f1.Pitch-f2.Pitch, 2) +
+			math.Pow(f1.Duration-f2.Duration, 2) +
+			math.Pow(f1.PeakFreq-f2.PeakFreq, 2) +
+			math.Pow(f1.RootMeanSquare-f2.RootMeanSquare, 2) +
+			math.Pow(f1.SpectralCentroid-f2.SpectralCentroid, 2) +
+			math.Pow(f1.SpectralRolloff-f2.SpectralRolloff, 2) +
+			math.Pow(f1.FundamentalFreq-f2.FundamentalFreq, 2),
 	)
 }
 
@@ -178,13 +178,13 @@ func calculateMahalanobisDistance(feature, mean, stdDev AudioFeature) float64 {
 
 	return math.Sqrt(
 		math.Pow((feature.ZeroCrossRate-mean.ZeroCrossRate)/(stdDev.ZeroCrossRate+epsilon), 2) +
-		math.Pow((feature.Energy-mean.Energy)/(stdDev.Energy+epsilon), 2) +
-		math.Pow((feature.Pitch-mean.Pitch)/(stdDev.Pitch+epsilon), 2) +
-		math.Pow((feature.Duration-mean.Duration)/(stdDev.Duration+epsilon), 2) +
-		math.Pow((feature.PeakFreq-mean.PeakFreq)/(stdDev.PeakFreq+epsilon), 2) +
-		math.Pow((feature.RootMeanSquare-mean.RootMeanSquare)/(stdDev.RootMeanSquare+epsilon), 2) +
-		math.Pow((feature.SpectralCentroid-mean.SpectralCentroid)/(stdDev.SpectralCentroid+epsilon), 2) +
-		math.Pow((feature.SpectralRolloff-mean.SpectralRolloff)/(stdDev.SpectralRolloff+epsilon), 2) +
-		math.Pow((feature.FundamentalFreq-mean.FundamentalFreq)/(stdDev.FundamentalFreq+epsilon), 2),
+			math.Pow((feature.Energy-mean.Energy)/(stdDev.Energy+epsilon), 2) +
+			math.Pow((feature.Pitch-mean.Pitch)/(stdDev.Pitch+epsilon), 2) +
+			math.Pow((feature.Duration-mean.Duration)/(stdDev.Duration+epsilon), 2) +
+			math.Pow((feature.PeakFreq-mean.PeakFreq)/(stdDev.PeakFreq+epsilon), 2) +
+			math.Pow((feature.RootMeanSquare-mean.RootMeanSquare)/(stdDev.RootMeanSquare+epsilon), 2) +
+			math.Pow((feature.SpectralCentroid-mean.SpectralCentroid)/(stdDev.SpectralCentroid+epsilon), 2) +
+			math.Pow((feature.SpectralRolloff-mean.SpectralRolloff)/(stdDev.SpectralRolloff+epsilon), 2) +
+			math.Pow((feature.FundamentalFreq-mean.FundamentalFreq)/(stdDev.FundamentalFreq+epsilon), 2),
 	)
 }

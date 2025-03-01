@@ -93,25 +93,25 @@ func preprocess(audioData []float64) []float64 {
 	return processed
 }
 
-// 计算过零率
-func calculateZeroCrossRate(data []float64) float64 {
-	crossings := 0
-	for i := 1; i < len(data); i++ {
-		if (data[i-1] >= 0 && data[i] < 0) || (data[i-1] < 0 && data[i] >= 0) {
-			crossings++
-		}
-	}
-	return float64(crossings) / float64(len(data)-1)
-}
+// // 计算过零率
+// func calculateZeroCrossRate(data []float64) float64 {
+// 	crossings := 0
+// 	for i := 1; i < len(data); i++ {
+// 		if (data[i-1] >= 0 && data[i] < 0) || (data[i-1] < 0 && data[i] >= 0) {
+// 			crossings++
+// 		}
+// 	}
+// 	return float64(crossings) / float64(len(data)-1)
+// }
 
-// 计算能量
-func calculateEnergy(data []float64) float64 {
-	energy := 0.0
-	for _, sample := range data {
-		energy += sample * sample
-	}
-	return energy / float64(len(data))
-}
+// // 计算能量
+// func calculateEnergy(data []float64) float64 {
+// 	energy := 0.0
+// 	for _, sample := range data {
+// 		energy += sample * sample
+// 	}
+// 	return energy / float64(len(data))
+// }
 
 // 计算RMS
 func calculateRMS(data []float64) float64 {
@@ -123,25 +123,25 @@ func extractFeatures(processedAudio []float64) AudioFeature {
 	// 基本特征计算
 	zeroCrossRate := calculateZeroCrossRate(processedAudio)
 	energy := calculateEnergy(processedAudio)
-	rms := calculateRMS(processedAudio)
+	// rms := calculateRMS(processedAudio)
 
-	// FFT计算
-	fftData := performFFT(processedAudio)
-	peakFreq := findPeakFrequency(fftData)
-	spectralCentroid := calculateSpectralCentroid(fftData)
-	spectralRolloff := calculateSpectralRolloff(fftData)
-	fundamentalFreq := estimateFundamentalFrequency(fftData)
+	// // FFT计算
+	// fftData := performFFT(processedAudio)
+	// peakFreq := findPeakFrequency(fftData)
+	// spectralCentroid := calculateSpectralCentroid(fftData)
+	// spectralRolloff := calculateSpectralRolloff(fftData)
+	// fundamentalFreq := estimateFundamentalFrequency(fftData)
 
 	return AudioFeature{
-		ZeroCrossRate:    zeroCrossRate,
-		Energy:           energy,
-		RootMeanSquare:   rms,
-		PeakFreq:         peakFreq,
-		SpectralCentroid: spectralCentroid,
-		SpectralRolloff:  spectralRolloff,
-		FundamentalFreq:  fundamentalFreq,
-		Duration:         float64(len(processedAudio)) / 44100.0, // 假设采样率44.1kHz
-		Pitch:            fundamentalFreq,                        // 使用基频作为音高特征
+		ZeroCrossRate: zeroCrossRate,
+		Energy:        energy,
+		// RootMeanSquare: rms,
+		// PeakFreq:       peakFreq,
+		// SpectralCentroid: spectralCentroid,
+		// SpectralRolloff:  spectralRolloff,
+		// FundamentalFreq:  fundamentalFreq,
+		// Duration:         float64(len(processedAudio)) / 44100.0, // 假设采样率44.1kHz
+		// Pitch:            fundamentalFreq,                        // 使用基频作为音高特征
 	}
 }
 

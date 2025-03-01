@@ -24,8 +24,6 @@ package main
 
 import "C"
 import (
-	"encoding/json"
-	"runtime"
 	"sync"
 	"unsafe"
 )
@@ -119,4 +117,5 @@ func ReleaseSDK() {
 	ReleaseSDK()
 }
 
-func main() {}
+// func main() {
+// }
