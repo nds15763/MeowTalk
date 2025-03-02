@@ -37,6 +37,9 @@ type MockAudioProcessor struct {
 	recentResults     []MockResult // 最近的分析结果
 	continuousPattern bool         // 是否检测到连续模式
 	mu                sync.Mutex   // 锁
+	windowSize        int          // 滑动窗口大小（样本数）
+	stepSize          int          // 滑动窗口步进（样本数）
+	maxBufferSize     int          // 最大缓冲区大小（样本数）
 }
 
 // NewMockAudioProcessor 创建新的音频处理器
@@ -49,6 +52,9 @@ func NewMockAudioProcessor() *MockAudioProcessor {
 		sampleRate:       44100, // 默认采样率
 		recentResults:    make([]MockResult, 0, 5),
 		lastProcessTime:  time.Now(),
+		windowSize:       200,   // 滑动窗口大小200样本
+		stepSize:         100,   // 滑动窗口步进100样本（50%重叠）
+		maxBufferSize:    10000, // 最大缓冲区大小10000样本
 	}
 }
 
@@ -80,68 +86,147 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 		return nil, fmt.Errorf("音频数据为空")
 	}
 
-	// 确保外部数据添加到缓冲区
 	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// 将新数据追加到缓冲区
 	m.audioBuffer = append(m.audioBuffer, data...)
+
+	// 检查缓冲区大小是否超过最大限制
+	if len(m.audioBuffer) > m.maxBufferSize {
+		// 保留最后maxBufferSize个样本，丢弃前面的数据
+		m.audioBuffer = m.audioBuffer[len(m.audioBuffer)-m.maxBufferSize:]
+		log.Printf("缓冲区超过最大限制 %d 样本，已截断", m.maxBufferSize)
+	}
+
 	bufferDuration := float64(len(m.audioBuffer)) / float64(m.sampleRate)
 	log.Printf("音频缓冲区：当前长度=%d 样本, 持续时间=%.2f秒", len(m.audioBuffer), bufferDuration)
-	m.mu.Unlock()
 
-	var processBuffer bool
-	var processingData []float64
+	// 确定是否需要处理音频
+	shouldProcess := false
+
+	// 检查是否有足够的窗口数量
+	windowCount := 0
+	if len(m.audioBuffer) >= m.windowSize {
+		windowCount = 1 + (len(m.audioBuffer)-m.windowSize)/m.stepSize
+	}
+
+	// 条件1：至少形成3个完整窗口
+	if windowCount >= 3 {
+		shouldProcess = true
+		log.Printf("处理条件：已形成 %d 个滑动窗口", windowCount)
+	}
 
 	// 检查是否有足够长的静默段
 	segments, silenceDetected := m.detectSilence(m.audioBuffer)
 
-	timeElapsed := time.Since(m.lastProcessTime).Seconds()
+	// 条件2：检测到静默，表示叫声可能结束
+	if silenceDetected && len(segments) > 0 {
+		shouldProcess = true
+		log.Printf("处理条件：检测到静默，得到 %d 个分段", len(segments))
+	}
 
-	// 改进处理策略:
-	// 1. 检测到足够长的静默，表示叫声结束
-	// 2. 缓冲区超过最大允许时间
-	// 3. 缓冲区超过最小处理时间（1秒）且已过去超过0.5秒
-	// 4. 会话结束前强制处理（由handleStop单独处理）
-
-	if silenceDetected && bufferDuration >= 0.5 {
-		log.Printf("检测到静默，处理前%d个音频样本", len(m.audioBuffer)-len(segments[len(segments)-1]))
-		// 只处理到静默开始的部分（即所有非最后一个片段的数据）
-		totalLength := len(m.audioBuffer) - len(segments[len(segments)-1])
-		processingData = make([]float64, totalLength)
-		copy(processingData, m.audioBuffer[:totalLength])
-		// 保留静默后的部分到缓冲区
-		m.audioBuffer = m.audioBuffer[totalLength:]
-		processBuffer = true
-	} else if bufferDuration >= m.maxBufferTime {
-		// 缓冲区太长，需要处理
+	// 条件3：缓冲区超过最大缓冲时间
+	if bufferDuration >= m.maxBufferTime {
+		shouldProcess = true
 		log.Printf("缓冲区达到最大时间 (%.2f秒)，处理数据", bufferDuration)
-		processingData = make([]float64, len(m.audioBuffer))
-		copy(processingData, m.audioBuffer)
-		m.audioBuffer = m.audioBuffer[:0]
-		processBuffer = true
-	} else if bufferDuration >= m.minProcessTime && timeElapsed >= 0.5 {
-		// 超过最小处理时间，且自上次处理已经过去了足够长的时间
+	}
+
+	// 条件4：超过最小处理时间，且自上次处理已经过去了足够长的时间
+	timeSinceLastProcess := time.Since(m.lastProcessTime).Seconds()
+	if bufferDuration >= m.minProcessTime && timeSinceLastProcess >= 0.5 {
+		shouldProcess = true
 		log.Printf("达到最小处理时间 (%.2f秒) 且间隔足够长 (%.2f秒), 处理数据",
-			bufferDuration, timeElapsed)
-		processingData = make([]float64, len(m.audioBuffer))
-		copy(processingData, m.audioBuffer)
-		m.audioBuffer = m.audioBuffer[:0]
-		processBuffer = true
+			bufferDuration, timeSinceLastProcess)
 	}
 
-	m.mu.Lock()
-	m.buffer = m.buffer[:0]
-	m.lastProcessTime = time.Now()
-	m.mu.Unlock()
-
-	// 如果不需要处理，返回空结果
-	if !processBuffer {
-		log.Println("缓冲区不需要处理，跳过")
-		return nil, nil
+	// 如果不需要处理，返回等待状态
+	if !shouldProcess {
+		log.Println("缓冲区不需要处理，等待更多数据")
+		return json.Marshal(AnalysisResult{
+			Status: "waiting",
+		})
 	}
 
-	log.Printf("开始处理音频: 处理数据长度=%d", len(processingData))
+	log.Printf("开始处理音频缓冲区: 长度=%d样本, 时长=%.2f秒", len(m.audioBuffer), bufferDuration)
 
 	// 处理音频数据
-	return m.processBuffer(streamID, processingData)
+	result, err := m.processBuffer(streamID, m.audioBuffer)
+
+	// 保留最后1个窗口大小的数据以保持连续性
+	retainSamples := m.windowSize
+	if len(m.audioBuffer) > retainSamples {
+		m.audioBuffer = m.audioBuffer[len(m.audioBuffer)-retainSamples:]
+		log.Printf("保留 %d 个样本以确保处理连续性", retainSamples)
+	}
+
+	m.lastProcessTime = time.Now()
+
+	return result, err
+}
+
+// processBuffer 处理缓冲区中的音频数据
+func (m *MockAudioProcessor) processBuffer(streamID string, data []float64) ([]byte, error) {
+	if len(data) == 0 {
+		return []byte(`{"status":"empty"}`), nil
+	}
+
+	// 创建滑动窗口
+	windows := m.createSlidingWindows(data)
+	log.Printf("创建了 %d 个滑动窗口", len(windows))
+
+	// 检测静默并处理音频
+	segments, hasSilence := m.detectSilence(data)
+
+	// 如果检测到静默，则处理每个段落
+	var result []byte
+	var err error
+
+	if hasSilence && len(segments) > 0 {
+		// 处理每个分段
+		var combinedResults []AnalysisResult
+
+		for i, segment := range segments {
+			if len(segment) >= m.windowSize {
+				// 处理足够长的段落
+				segWindows := m.createSlidingWindows(segment)
+				if len(segWindows) > 0 {
+					_, segResult := m.processAudioSegment(streamID, segment)
+					segResult.Status = fmt.Sprintf("segment_%d", i+1)
+					combinedResults = append(combinedResults, segResult)
+				}
+			}
+		}
+
+		if len(combinedResults) > 0 {
+			// 返回多个分段的结果
+			result, err = json.Marshal(combinedResults)
+		} else {
+			// 如果没有足够长的分段，处理整个缓冲区
+			windowResults, analysisResult := m.processAudioSegment(streamID, data)
+
+			// 保存处理音频数据
+			if analysisResult.Confidence > 0.5 {
+				m.saveProcessedAudio(streamID, data, analysisResult.Emotion, analysisResult.Confidence,
+					extractFinalFeatures(windowResults))
+			}
+
+			result, err = json.Marshal(analysisResult)
+		}
+	} else {
+		// 处理整个缓冲区
+		windowResults, analysisResult := m.processAudioSegment(streamID, data)
+
+		// 保存处理音频数据
+		if analysisResult.Confidence > 0.5 {
+			m.saveProcessedAudio(streamID, data, analysisResult.Emotion, analysisResult.Confidence,
+				extractFinalFeatures(windowResults))
+		}
+
+		result, err = json.Marshal(analysisResult)
+	}
+
+	return result, err
 }
 
 // detectSilence 检测缓冲区中的静默段
@@ -235,45 +320,112 @@ func (m *MockAudioProcessor) detectSilence(data []float64) ([][]float64, bool) {
 	return segments, false
 }
 
-// processBuffer 处理缓冲区中的音频数据
-func (m *MockAudioProcessor) processBuffer(streamID string, data []float64) ([]byte, error) {
+// processAudioSegment 处理单个音频片段
+func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64) ([]AudioFeature, AnalysisResult) {
+	log.Printf("开始音频片段处理: 长度=%d", len(data))
+
 	if len(data) == 0 {
-		return []byte(`{"status":"empty"}`), nil
+		return nil, AnalysisResult{Status: "empty"}
 	}
 
-	// 检测静默并处理音频
-	segments, _ := m.detectSilence(data)
-	if len(segments) == 0 {
-		return []byte(`{"status":"no_cat_sound"}`), nil
+	// 窗口大小（250毫秒）和滑动大小（125毫秒，50%重叠）
+	windowSize := m.windowSize // 250毫秒
+	stepSize := m.stepSize     // 50%重叠
+	if windowSize > len(data) {
+		windowSize = len(data)
 	}
 
-	// 处理最长的声音片段
-	longestSegment := segments[0]
-	maxLength := len(longestSegment)
-	for i := 1; i < len(segments); i++ {
-		if len(segments[i]) > maxLength {
-			longestSegment = segments[i]
-			maxLength = len(segments[i])
+	// 计算将创建多少个窗口
+	windowCount := 0
+	if len(data) > windowSize {
+		windowCount = 1 + (len(data)-windowSize)/stepSize
+	} else {
+		windowCount = 1
+	}
+
+	// 记录窗口分析
+	log.Printf("音频分析 [%s]: 总长度 %.2f秒, 使用 %d 个 %d毫秒窗口, 重叠率 50%%",
+		streamID, float64(len(data))/float64(m.sampleRate), windowCount, windowSize*1000/m.sampleRate)
+
+	// 对多个窗口进行分析
+	energyMax := 0.0
+	pitchSum := 0.0
+	pitchCount := 0
+
+	var windowResults []AudioFeature
+
+	for i := 0; i < len(data)-windowSize+1; i += stepSize {
+		windowIndex := i / stepSize
+		// 提取窗口数据
+		windowData := data[i : i+windowSize]
+		// 应用汉明窗
+		windowedData := applyHammingWindow(windowData)
+		// 提取特征
+		features := extractAudioFeatures(windowedData, m.sampleRate, windowIndex, float64(i)/float64(m.sampleRate), float64(i+windowSize)/float64(m.sampleRate))
+
+		// 记录每个窗口的关键特征
+		log.Printf("窗口 #%d [%s] (%.2f-%.2f秒): 能量=%.2f, 音高=%.2f Hz",
+			windowIndex+1,
+			streamID,
+			float64(i)/float64(m.sampleRate),
+			float64(i+windowSize)/float64(m.sampleRate),
+			features.Energy,
+			features.Pitch)
+
+		// 添加到结果集
+		windowResults = append(windowResults, features)
+
+		// 跟踪最大能量和有效音高
+		if features.Energy > energyMax {
+			energyMax = features.Energy
+		}
+
+		if features.Pitch > 0 {
+			pitchSum += features.Pitch
+			pitchCount++
 		}
 	}
 
-	log.Printf("处理音频片段: 片段长度=%d, 片段数量=%d, 最长片段长度=%d",
-		len(data), len(segments), len(longestSegment))
-
-	// 处理音频片段
-	windowResults, result := m.processAudioSegment(streamID, longestSegment)
-
-	// 打印分析结果
-	log.Printf(" 分析结果: 情感=%s, 置信度=%.2f, 窗口数=%d",
-		result.Emotion, result.Confidence, len(windowResults))
-
-	// 保存处理音频数据
-	if result.Confidence > 0.5 {
-		m.saveProcessedAudio(streamID, longestSegment, result.Emotion, result.Confidence,
-			extractFinalFeatures(windowResults))
+	// 如果没有窗口结果，返回未知
+	if len(windowResults) == 0 {
+		return nil, AnalysisResult{
+			Status:     "no_features",
+			Emotion:    "unknown",
+			Confidence: 0,
+		}
 	}
 
-	return json.Marshal(result)
+	// 从多窗口分析结果中提取最终特征
+	finalFeatures := extractFinalFeatures(windowResults)
+
+	// 从样本库匹配情感
+	emotion, confidence := recognizeEmotion(finalFeatures)
+
+	// 如果匹配置信度低，尝试使用AI分析
+	if confidence < 0.65 {
+		log.Printf("[%s] 情感匹配置信度较低(%.2f)，尝试使用AI分析", streamID, confidence)
+
+		// 获取原始音频数据
+		audioData := data
+		if len(audioData) > 0 {
+			aiEmotion, aiConfidence := m.analyzeEmotionWithAI(windowResults)
+
+			// 如果AI分析置信度更高，则采用AI结果
+			if aiConfidence > confidence {
+				log.Printf("[%s] 采用AI分析结果: %s (置信度: %.2f)", streamID, aiEmotion, aiConfidence)
+				emotion = aiEmotion
+				confidence = aiConfidence
+			}
+		}
+	}
+
+	log.Printf("[%s] 情感分析结果: %s (置信度: %.2f)\n", streamID, emotion, confidence)
+
+	return windowResults, AnalysisResult{
+		Status:     "success",
+		Emotion:    emotion,
+		Confidence: confidence,
+	}
 }
 
 // AudioFeatures 简化的音频特征，用于情感识别
@@ -325,12 +477,33 @@ func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 	}
 }
 
+// AudioFeature 详细的音频特征
+type AudioFeature struct {
+	WindowIndex      int     // 窗口索引
+	StartTime        float64 // 窗口开始时间（秒）
+	EndTime          float64 // 窗口结束时间（秒）
+	Energy           float64 // 音频能量
+	ZeroCrossRate    float64 // 过零率
+	RootMeanSquare   float64 // 均方根值
+	PeakFreq         float64 // 峰值频率
+	SpectralCentroid float64 // 频谱质心
+	SpectralRolloff  float64 // 频谱滚降点
+	FundamentalFreq  float64 // 基频
+	Pitch            float64 // 音高
+	Duration         float64 // 持续时间
+}
+
 // extractAudioFeatures 提取音频特征
-func extractAudioFeatures(data []float64) AudioFeature {
+func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, startTime float64, endTime float64) AudioFeature {
 	var features AudioFeature
 
+	// 设置窗口信息
+	features.WindowIndex = windowIndex
+	features.StartTime = startTime
+	features.EndTime = endTime
+
 	// 计算持续时间（秒）
-	features.Duration = float64(len(data)) / 44100.0 // 假设采样率为44.1kHz
+	features.Duration = float64(len(data)) / float64(sampleRate)
 
 	// 计算过零率
 	features.ZeroCrossRate = calculateZeroCrossRate(data)
@@ -342,7 +515,7 @@ func extractAudioFeatures(data []float64) AudioFeature {
 	features.RootMeanSquare = math.Sqrt(features.Energy)
 
 	// 计算峰值频率
-	features.PeakFreq = calculatePeakFrequency(data, 44100)
+	features.PeakFreq = calculatePeakFrequency(data, sampleRate)
 
 	// 计算频谱
 	spectrum := performFFT(data)
@@ -357,12 +530,12 @@ func extractAudioFeatures(data []float64) AudioFeature {
 	features.FundamentalFreq = estimateFundamentalFrequency(data)
 
 	// 估计音高
-	features.Pitch = estimatePitch(data, 44100)
+	features.Pitch = estimatePitch(data, sampleRate)
 
 	// 记录提取的特征数据
-	log.Printf("音频特征: 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2fs, ZCR=%.2f, 峰值频率=%.2f, 频谱质心=%.2f",
-		features.Energy, features.Pitch, features.Duration, features.ZeroCrossRate,
-		features.PeakFreq, features.SpectralCentroid)
+	log.Printf("窗口 #%d (%.2f-%.2f秒): 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2fs, ZCR=%.2f",
+		features.WindowIndex, features.StartTime, features.EndTime,
+		features.Energy, features.Pitch, features.Duration, features.ZeroCrossRate)
 
 	return features
 }
@@ -1118,111 +1291,20 @@ func (m *MockAudioProcessor) handleWebSocket(w http.ResponseWriter, r *http.Requ
 	log.Printf("WebSocket连接关闭: StreamID=%s", streamID)
 }
 
-// processAudioSegment 处理单个音频片段
-func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64) ([]AudioFeature, AnalysisResult) {
-	log.Printf("开始音频片段处理: 长度=%d", len(data))
+// createSlidingWindows 创建滑动窗口
+func (m *MockAudioProcessor) createSlidingWindows(data []float64) [][]float64 {
+	var windows [][]float64
 
-	if len(data) == 0 {
-		return nil, AnalysisResult{Status: "empty"}
+	// 如果数据少于窗口大小，返回空
+	if len(data) < m.windowSize {
+		return windows
 	}
 
-	// 窗口大小（250毫秒）和滑动大小（125毫秒，50%重叠）
-	windowSize := int(0.25 * float64(m.sampleRate)) // 250毫秒
-	// slideSize := windowSize / 2                     // 50%重叠
-	if windowSize > len(data) {
-		windowSize = len(data)
-	}
-	stepSize := windowSize / 2 // 50%重叠
-
-	// 计算将创建多少个窗口
-	windowCount := 0
-	if len(data) > windowSize {
-		windowCount = 1 + (len(data)-windowSize)/stepSize
-	} else {
-		windowCount = 1
+	// 创建滑动窗口
+	for i := 0; i <= len(data)-m.windowSize; i += m.stepSize {
+		window := data[i : i+m.windowSize]
+		windows = append(windows, window)
 	}
 
-	// 记录窗口分析
-	log.Printf("音频分析 [%s]: 总长度 %.2f秒, 使用 %d 个 %d毫秒窗口, 重叠率 50%%",
-		streamID, float64(len(data))/float64(m.sampleRate), windowCount, windowSize*1000/m.sampleRate)
-
-	// 对多个窗口进行分析
-	energyMax := 0.0
-	pitchSum := 0.0
-	pitchCount := 0
-
-	var windowResults []AudioFeature
-
-	for i := 0; i < len(data)-windowSize+1; i += stepSize {
-		windowIndex := i / stepSize
-		// 提取窗口数据
-		windowData := data[i : i+windowSize]
-		// 应用汉明窗
-		windowedData := applyHammingWindow(windowData)
-		// 提取特征
-		features := extractAudioFeatures(windowedData)
-
-		// 记录每个窗口的关键特征
-		log.Printf("窗口 #%d [%s] (%.2f-%.2f秒): 能量=%.2f, 音高=%.2f Hz",
-			windowIndex+1,
-			streamID,
-			float64(i)/float64(m.sampleRate),
-			float64(i+windowSize)/float64(m.sampleRate),
-			features.Energy,
-			features.Pitch)
-
-		// 添加到结果集
-		windowResults = append(windowResults, features)
-
-		// 跟踪最大能量和有效音高
-		if features.Energy > energyMax {
-			energyMax = features.Energy
-		}
-
-		if features.Pitch > 0 {
-			pitchSum += features.Pitch
-			pitchCount++
-		}
-	}
-
-	// 如果没有窗口结果，返回未知
-	if len(windowResults) == 0 {
-		return nil, AnalysisResult{
-			Status:     "no_features",
-			Emotion:    "unknown",
-			Confidence: 0,
-		}
-	}
-
-	// 从多窗口分析结果中提取最终特征
-	finalFeatures := extractFinalFeatures(windowResults)
-
-	// 从样本库匹配情感
-	emotion, confidence := recognizeEmotion(finalFeatures)
-
-	// 如果匹配置信度低，尝试使用AI分析
-	if confidence < 0.65 {
-		log.Printf("[%s] 情感匹配置信度较低(%.2f)，尝试使用AI分析", streamID, confidence)
-
-		// 获取原始音频数据
-		audioData := data
-		if len(audioData) > 0 {
-			aiEmotion, aiConfidence := m.analyzeEmotionWithAI(windowResults)
-
-			// 如果AI分析置信度更高，则采用AI结果
-			if aiConfidence > confidence {
-				log.Printf("[%s] 采用AI分析结果: %s (置信度: %.2f)", streamID, aiEmotion, aiConfidence)
-				emotion = aiEmotion
-				confidence = aiConfidence
-			}
-		}
-	}
-
-	log.Printf("[%s] 情感分析结果: %s (置信度: %.2f)\n", streamID, emotion, confidence)
-
-	return windowResults, AnalysisResult{
-		Status:     "success",
-		Emotion:    emotion,
-		Confidence: confidence,
-	}
+	return windows
 }

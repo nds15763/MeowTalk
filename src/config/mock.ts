@@ -12,7 +12,7 @@ export const MOCK_CONFIG = {
     ENDPOINTS: {
       INIT: '/init',
       START: '/start',
-      SEND: '/send',
+      SEND: '/api/send',
       RECV: '/recv',
       STOP: '/stop'
     },

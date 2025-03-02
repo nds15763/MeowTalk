@@ -50,7 +50,7 @@ export default function TestAudioPage() {
                  `数据长度: ${audioData.length}`, 
                  `数据示例: [${audioData.slice(0, 3).join(', ')}...]`);
       
-      const response = await fetch(`${MOCK_CONFIG.SERVER.URL}/send`, {
+      const response = await fetch(`${MOCK_CONFIG.SERVER.URL}/api/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

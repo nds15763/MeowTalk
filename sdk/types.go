@@ -2,21 +2,21 @@ package main
 
 import "errors"
 
-// AudioFeature 存储提取的特征
-type AudioFeature struct {
-	// 时域特征
-	ZeroCrossRate  float64 // 过零率
-	Energy         float64 // 能量
-	RootMeanSquare float64 // 均方根值
-	Duration       float64 // 持续时间
+// // AudioFeature 存储提取的特征
+// type AudioFeature struct {
+// 	// 时域特征
+// 	ZeroCrossRate  float64 // 过零率
+// 	Energy         float64 // 能量
+// 	RootMeanSquare float64 // 均方根值
+// 	Duration       float64 // 持续时间
 
-	// 频域特征
-	Pitch            float64 // 音高
-	PeakFreq         float64 // 峰值频率
-	SpectralCentroid float64 // 频谱质心
-	SpectralRolloff  float64 // 频谱衰减点
-	FundamentalFreq  float64 // 基频
-}
+// 	// 频域特征
+// 	Pitch            float64 // 音高
+// 	PeakFreq         float64 // 峰值频率
+// 	SpectralCentroid float64 // 频谱质心
+// 	SpectralRolloff  float64 // 频谱衰减点
+// 	FundamentalFreq  float64 // 基频
+// }
 
 // AudioSample 音频样本
 type AudioSample struct {
