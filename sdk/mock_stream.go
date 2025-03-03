@@ -244,50 +244,76 @@ func (m *MockAudioProcessor) processBuffer(streamID string, data []float64) ([]b
 
 // AudioFeatures 简化的音频特征，用于情感识别
 type AudioFeatures struct {
-	Energy   float64
-	Pitch    float64
-	Duration float64
+	Energy           float64
+	Pitch            float64
+	Duration         float64
+	ZeroCrossRate    float64
+	RootMeanSquare   float64
+	PeakFreq         float64
+	SpectralCentroid float64
+	SpectralRolloff  float64
+	FundamentalFreq  float64
 }
 
 // 从窗口结果集中提取最终特征
 func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 	if len(windowResults) == 0 {
-		return AudioFeatures{}
+		return AudioFeatures{} // 返回空特征
 	}
 
-	// 查找最大能量和平均音高
+	// 找出具有最高能量的窗口和平均音高/持续时间
 	maxEnergy := 0.0
+	maxEnergyIndex := 0
 	totalPitch := 0.0
-	validPitchCount := 0
-	totalDuration := 0.0
+	pitchCount := 0
+	avgDuration := 0.0
 
-	for _, result := range windowResults {
-		if result.Energy > maxEnergy {
-			maxEnergy = result.Energy
+	for i, feature := range windowResults {
+		// 跟踪最高能量
+		if feature.Energy > maxEnergy {
+			maxEnergy = feature.Energy
+			maxEnergyIndex = i
 		}
 
-		if result.Pitch > 0 {
-			totalPitch += result.Pitch
-			validPitchCount++
+		// 累加有效音高值
+		if feature.Pitch > 0 {
+			totalPitch += feature.Pitch
+			pitchCount++
 		}
 
-		totalDuration += result.Duration
+		// 累加其他特征值
+		if feature.Duration > 0 {
+			avgDuration += feature.Duration
+		}
 	}
 
-	// 计算平均音高
+	// 计算平均值
 	avgPitch := 0.0
-	if validPitchCount > 0 {
-		avgPitch = totalPitch / float64(validPitchCount)
+	if pitchCount > 0 {
+		avgPitch = totalPitch / float64(pitchCount)
 	}
 
-	// 计算平均持续时间
-	avgDuration := totalDuration / float64(len(windowResults))
+	featureCount := len(windowResults)
+	if featureCount > 0 {
+		avgDuration = avgDuration / float64(featureCount)
+	}
 
-	// 构建最终特征
+	// 获取最高能量窗口的其他特征
+	bestFeature := windowResults[maxEnergyIndex]
+
+	log.Printf("使用最高能量窗口的特征: 窗口#%d，能量=%.6f", maxEnergyIndex, maxEnergy)
+
+	// 构建最终特征，使用最高能量窗口的特征值
 	return AudioFeatures{
-		Energy:   maxEnergy,
-		Pitch:    avgPitch,
-		Duration: avgDuration,
+		Energy:           maxEnergy,
+		Pitch:            avgPitch,                  // 使用平均音高，因为单个窗口的音高可能不稳定
+		Duration:         avgDuration,               // 使用平均持续时间
+		ZeroCrossRate:    bestFeature.ZeroCrossRate, // 使用最高能量窗口的特征
+		RootMeanSquare:   bestFeature.RootMeanSquare,
+		PeakFreq:         bestFeature.PeakFreq,
+		SpectralCentroid: bestFeature.SpectralCentroid,
+		SpectralRolloff:  bestFeature.SpectralRolloff,
+		FundamentalFreq:  bestFeature.FundamentalFreq,
 	}
 }
 
@@ -591,8 +617,22 @@ var emotionProfiles = map[string]AudioFeatures{
 
 // recognizeEmotion 情感识别算法
 func recognizeEmotion(features AudioFeatures) (string, float64) {
-	log.Printf("开始情感识别: 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2f",
-		features.Energy, features.Pitch, features.Duration)
+	log.Printf("开始情感识别: 详细特征信息如下:")
+	log.Printf("  能量(Energy)=%.6f", features.Energy)
+	log.Printf("  音高(Pitch)=%.2f Hz", features.Pitch)
+	log.Printf("  持续时间(Duration)=%.2f 秒", features.Duration)
+	log.Printf("  其他参考特征:")
+	log.Printf("  ZeroCrossRate=%.6f", features.ZeroCrossRate)
+	log.Printf("  RootMeanSquare=%.6f", features.RootMeanSquare)
+	log.Printf("  PeakFreq=%.2f Hz", features.PeakFreq)
+	log.Printf("  SpectralCentroid=%.2f Hz", features.SpectralCentroid)
+	log.Printf("  SpectralRolloff=%.2f Hz", features.SpectralRolloff)
+	log.Printf("  FundamentalFreq=%.2f Hz", features.FundamentalFreq)
+
+	// 如果持续时间太短，认为是噪声
+	if features.Duration < 0.1 {
+		return "unknown", 0.0
+	}
 
 	// 标准化特征
 	normEnergy := min(features.Energy/1.0, 1.0)
@@ -600,9 +640,15 @@ func recognizeEmotion(features AudioFeatures) (string, float64) {
 	normDuration := min(features.Duration/2.0, 1.0)
 
 	normalizedFeatures := AudioFeatures{
-		Energy:   normEnergy,
-		Pitch:    normPitch,
-		Duration: normDuration,
+		Energy:           normEnergy,
+		Pitch:            normPitch,
+		Duration:         normDuration,
+		ZeroCrossRate:    features.ZeroCrossRate,
+		RootMeanSquare:   features.RootMeanSquare,
+		PeakFreq:         features.PeakFreq,
+		SpectralCentroid: features.SpectralCentroid,
+		SpectralRolloff:  features.SpectralRolloff,
+		FundamentalFreq:  features.FundamentalFreq,
 	}
 
 	bestEmotion := ""
@@ -875,7 +921,7 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 保存结果到会话
+	// 如果有结果，保存到会话
 	if result != nil && len(result) > 0 {
 		if session, ok := m.sessions.Load(req.StreamID); ok {
 			session.(*sync.Map).Store(time.Now().UnixNano(), result)
