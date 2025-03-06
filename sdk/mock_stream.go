@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/cmplx"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,6 +46,12 @@ type MockAudioProcessor struct {
 
 // NewMockAudioProcessor 创建新的音频处理器
 func NewMockAudioProcessor() *MockAudioProcessor {
+	// 尝试加载样本库
+	err := loadSampleLibrary("sdk/new_sample_library.json")
+	if err != nil {
+		log.Printf("加载样本库失败: %v，将使用传统方法进行情感识别", err)
+	}
+
 	return &MockAudioProcessor{
 		silenceThreshold: 0.02,  // 静默阈值，根据实际情况调整
 		minSilenceTime:   0.3,   // 最小静默时间0.3秒
@@ -606,11 +613,11 @@ func performFFT(data []float64) []complex128 {
 	}
 
 	// 应用汉明窗
-	windowed := applyHammingWindow(data)
+	windowedData := applyHammingWindow(data)
 
 	// 初始化FFT数据
 	fft := make([]complex128, n)
-	for i, val := range windowed {
+	for i, val := range windowedData {
 		fft[i] = complex(val, 0)
 	}
 
@@ -860,6 +867,131 @@ func recognizeEmotion(features AudioFeatures) (string, float64) {
 	}
 
 	log.Printf("识别结果: 情感=%s, 置信度=%.2f", bestEmotion, bestMatch)
+	return bestEmotion, bestMatch
+}
+
+// recognizeEmotionWithSamples 使用样本库进行情感识别
+func recognizeEmotionWithSamples(features AudioFeatures) (string, float64) {
+	log.Printf("基于样本库进行情感识别: 详细特征信息如下:")
+	log.Printf("  能量(Energy)=%.6f", features.Energy)
+	log.Printf("  音高(Pitch)=%.2f Hz", features.Pitch)
+	log.Printf("  持续时间(Duration)=%.2f秒", features.Duration)
+	log.Printf("  过零率(ZeroCrossRate)=%.6f", features.ZeroCrossRate)
+	log.Printf("  峰值频率(PeakFreq)=%.2f Hz", features.PeakFreq)
+	log.Printf("  基频(FundamentalFreq)=%.2f Hz", features.FundamentalFreq)
+
+	// 如果样本库未加载，返回传统方法结果
+	if sampleLibrary == nil {
+		log.Printf("样本库未加载，使用传统方法识别情感")
+		return recognizeEmotion(features)
+	}
+
+	// 如果持续时间太短，认为是噪声
+	if features.Duration < 0.1 {
+		return "unknown", 0.0
+	}
+
+	bestEmotion := ""
+	bestMatch := 0.0
+	allConfidences := make(map[string]float64)
+	emotionCounts := make(map[string]int)
+
+	// 遍历样本库中的每个情感类别
+	for emotion, samples := range sampleLibrary.Samples {
+		if len(samples) == 0 {
+			continue
+		}
+
+		// 计算与当前情感类别所有样本的匹配度
+		totalMatch := 0.0
+		matchCount := 0
+
+		for _, sample := range samples {
+			// 计算特征距离
+			pitchDiff := 0.0
+			if features.Pitch > 0 && sample.Features.Pitch > 0 {
+				pitchDiff = math.Abs(features.Pitch-sample.Features.Pitch) / math.Max(features.Pitch, sample.Features.Pitch)
+			} else {
+				pitchDiff = 1.0 // 如果任一方没有音高，则差异最大
+			}
+
+			zeroCrossDiff := math.Abs(features.ZeroCrossRate - sample.Features.ZeroCrossRate)
+			rmsDiff := math.Abs(features.RootMeanSquare-sample.Features.RootMeanSquare) /
+				math.Max(0.001, math.Max(features.RootMeanSquare, sample.Features.RootMeanSquare))
+
+			peakFreqDiff := 0.0
+			if features.PeakFreq > 0 && sample.Features.PeakFreq > 0 {
+				peakFreqDiff = math.Abs(features.PeakFreq-sample.Features.PeakFreq) /
+					math.Max(features.PeakFreq, sample.Features.PeakFreq)
+			} else {
+				peakFreqDiff = 1.0
+			}
+
+			fundFreqDiff := 0.0
+			if features.FundamentalFreq > 0 && sample.Features.FundamentalFreq > 0 {
+				fundFreqDiff = math.Abs(features.FundamentalFreq-sample.Features.FundamentalFreq) /
+					math.Max(features.FundamentalFreq, sample.Features.FundamentalFreq)
+			} else {
+				fundFreqDiff = 1.0
+			}
+
+			// 计算综合匹配度（权重可调整）
+			// 把各项差异归一化到0-1范围，0表示完全匹配
+			totalDiff := pitchDiff*0.3 + zeroCrossDiff*0.15 + rmsDiff*0.15 +
+				peakFreqDiff*0.2 + fundFreqDiff*0.2
+
+			match := 1.0 - min(totalDiff, 1.0) // 转换为匹配度，1为完全匹配
+
+			if match > 0.1 { // 只考虑最低匹配度以上的样本
+				totalMatch += match
+				matchCount++
+			}
+		}
+
+		// 计算平均匹配度
+		if matchCount > 0 {
+			averageMatch := totalMatch / float64(matchCount)
+			allConfidences[emotion] = averageMatch
+			emotionCounts[emotion] = matchCount
+
+			log.Printf("情感[%s]平均匹配度: %.4f (基于%d个样本)",
+				emotion, averageMatch, matchCount)
+
+			// 更新最佳匹配
+			if averageMatch > bestMatch {
+				bestMatch = averageMatch
+				bestEmotion = emotion
+			}
+		}
+	}
+
+	// 转换情感类别为前端定义的ID（如果需要）
+	if bestEmotion != "" {
+		// 对比前端emotions.ts中定义的情感ID
+		// 这里进行情感ID的映射，确保与前端定义一致
+		switch bestEmotion {
+		// 处理需要特殊映射的情感ID
+		case "ask-for-play", "ask-for-hunting", "for-food", "for-fight":
+			// 将带连字符的ID转换为下划线形式
+			bestEmotion = strings.ReplaceAll(bestEmotion, "-", "_")
+		}
+	}
+
+	// 记录所有情感的置信度
+	var confidenceInfo strings.Builder
+	confidenceInfo.WriteString("所有情感置信度: ")
+	for emotion, confidence := range allConfidences {
+		confidenceInfo.WriteString(fmt.Sprintf("%s=%.2f ", emotion, confidence))
+	}
+	log.Println(confidenceInfo.String())
+
+	// 如果最佳匹配的置信度太低，返回"unknown"
+	if bestMatch < 0.5 {
+		log.Printf("置信度过低(%.2f)，无法确定情感类型", bestMatch)
+		return "unknown", bestMatch
+	}
+
+	log.Printf("样本库识别结果: 情感=%s, 置信度=%.4f", bestEmotion, bestMatch)
 	return bestEmotion, bestMatch
 }
 
@@ -1504,7 +1636,7 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 	finalFeatures := extractFinalFeatures(windowResults)
 
 	// 从样本库匹配情感
-	emotion, confidence := recognizeEmotion(finalFeatures)
+	emotion, confidence := recognizeEmotionWithSamples(finalFeatures)
 
 	// 如果匹配置信度低，尝试使用AI分析
 	if confidence < 0.65 {
@@ -1539,4 +1671,46 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// SampleLibrary 样本库结构
+type JsonSampleLibrary struct {
+	TotalSamples int                      `json:"totalSamples"`
+	Emotions     []string                 `json:"emotions"`
+	Samples      map[string][]SampleEntry `json:"samples"`
+}
+
+// SampleEntry 样本条目
+type SampleEntry struct {
+	FilePath string        `json:"FilePath"`
+	Emotion  string        `json:"Emotion"`
+	Features AudioFeatures `json:"Features"`
+}
+
+var sampleLibrary *JsonSampleLibrary
+
+// loadSampleLibrary 加载样本库
+func loadSampleLibrary(filePath string) error {
+	log.Printf("加载样本库: %s", filePath)
+
+	// 读取JSON文件
+	fileData, err := os.ReadFile(filePath)
+	if err != nil {
+		log.Printf("无法读取样本库文件: %v", err)
+		return err
+	}
+
+	// 解析JSON
+	var library JsonSampleLibrary
+	err = json.Unmarshal(fileData, &library)
+	if err != nil {
+		log.Printf("解析样本库文件失败: %v", err)
+		return err
+	}
+
+	sampleLibrary = &library
+	log.Printf("样本库加载成功, 共 %d 个样本, %d 种情感类别",
+		library.TotalSamples, len(library.Emotions))
+
+	return nil
 }

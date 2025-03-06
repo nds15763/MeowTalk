@@ -1,0 +1,1036 @@
+{
+  "totalSamples": 64,
+  "emotions": [
+    "alert",
+    "anxious",
+    "ask_for_hunting",
+    "ask_for_play",
+    "ask",
+    "call",
+    "comfortable",
+    "courtship",
+    "curious",
+    "dieaway",
+    "discomfort",
+    "find",
+    "flighty",
+    "for_fight",
+    "for_food",
+    "for",
+    "goaway",
+    "goout",
+    "hello",
+    "satisfy",
+    "unhappy",
+    "warning",
+    "yummy"
+  ],
+  "samples": {
+    "alert": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\alert.mp3",
+        "Emotion": "alert",
+        "Features": {
+          "Duration": 5.433469387755102,
+          "Energy": 867.7724344463508,
+          "RootMeanSquare": 0.1903011414371506,
+          "ZeroCrossRate": 0.1854185794174109,
+          "PeakFreq": 510.3369140625,
+          "FundamentalFreq": 462.95315480547674,
+          "Pitch": 462.95315480547674,
+          "SpectralCentroid": 865.9381373296502,
+          "SpectralRolloff": 1266.15234375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\alert_1.mp3",
+        "Emotion": "alert",
+        "Features": {
+          "Duration": 5.511836734693878,
+          "Energy": 893.9588659340646,
+          "RootMeanSquare": 0.19177153924747906,
+          "ZeroCrossRate": 0.18487740661510613,
+          "PeakFreq": 510.3369140625,
+          "FundamentalFreq": 468.124761263337,
+          "Pitch": 468.124761263337,
+          "SpectralCentroid": 832.3120787838359,
+          "SpectralRolloff": 1236.005859375
+        }
+      }
+    ],
+    "anxious": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\anxious.mp3",
+        "Emotion": "anxious",
+        "Features": {
+          "Duration": 5.7208163265306125,
+          "Energy": 385.71422862675377,
+          "RootMeanSquare": 0.12364678016296657,
+          "ZeroCrossRate": 0.15474255816718854,
+          "PeakFreq": 503.876953125,
+          "FundamentalFreq": 466.6296219519727,
+          "Pitch": 466.6296219519727,
+          "SpectralCentroid": 988.2866336519203,
+          "SpectralRolloff": 1261.845703125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\anxious_1.mp3",
+        "Emotion": "anxious",
+        "Features": {
+          "Duration": 1.6979591836734693,
+          "Energy": 141.06612865519088,
+          "RootMeanSquare": 0.13725508911952294,
+          "ZeroCrossRate": 0.16159188034188035,
+          "PeakFreq": 501.7236328125,
+          "FundamentalFreq": 531.9413063462758,
+          "Pitch": 531.9413063462758,
+          "SpectralCentroid": 990.341708027307,
+          "SpectralRolloff": 1263.9990234375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\anxious_2.mp3",
+        "Emotion": "anxious",
+        "Features": {
+          "Duration": 3.996734693877551,
+          "Energy": 226.76231507274946,
+          "RootMeanSquare": 0.11342493999597895,
+          "ZeroCrossRate": 0.14586406445024397,
+          "PeakFreq": 506.0302734375,
+          "FundamentalFreq": 450.1465609420218,
+          "Pitch": 450.1465609420218,
+          "SpectralCentroid": 553.2506777983682,
+          "SpectralRolloff": 1059.43359375
+        }
+      }
+    ],
+    "ask_for_hunting": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask-for-hunting_1.mp3",
+        "Emotion": "ask_for_hunting",
+        "Features": {
+          "Duration": 0.6530612244897959,
+          "Energy": 0.21252843256977727,
+          "RootMeanSquare": 0.008590378026739206,
+          "ZeroCrossRate": 0.23645833333333333,
+          "PeakFreq": 1819.5556640625,
+          "FundamentalFreq": 578.7750053327701,
+          "Pitch": 578.7750053327701,
+          "SpectralCentroid": 1221.4685632963874,
+          "SpectralRolloff": 1950.908203125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask-for-hunting_2.mp3",
+        "Emotion": "ask_for_hunting",
+        "Features": {
+          "Duration": 0.7053061224489796,
+          "Energy": 0.15161694761446967,
+          "RootMeanSquare": 0.006981100159639356,
+          "ZeroCrossRate": 0.24911603985856637,
+          "PeakFreq": 111.97265625,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1313.0570081244268,
+          "SpectralRolloff": 1983.2080078125
+        }
+      }
+    ],
+    "ask_for_play": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask-for-play_1.mp3",
+        "Emotion": "ask_for_play",
+        "Features": {
+          "Duration": 1.4628571428571429,
+          "Energy": 8.029718836342951,
+          "RootMeanSquare": 0.03527792153356393,
+          "ZeroCrossRate": 0.36035337879727214,
+          "PeakFreq": 1897.0751953125,
+          "FundamentalFreq": 578.8323479687352,
+          "Pitch": 578.8323479687352,
+          "SpectralCentroid": 1383.1482623998852,
+          "SpectralRolloff": 1920.76171875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask-for-play_2.mp3",
+        "Emotion": "ask_for_play",
+        "Features": {
+          "Duration": 1.1493877551020408,
+          "Energy": 5.017938163044185,
+          "RootMeanSquare": 0.03146309973459531,
+          "ZeroCrossRate": 0.30933122903925825,
+          "PeakFreq": 1890.615234375,
+          "FundamentalFreq": 488.61370638077744,
+          "Pitch": 488.61370638077744,
+          "SpectralCentroid": 1458.2350796914986,
+          "SpectralRolloff": 2052.1142578125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask-for-play_3.mp3",
+        "Emotion": "ask_for_play",
+        "Features": {
+          "Duration": 1.5151020408163265,
+          "Energy": 5.333676340375192,
+          "RootMeanSquare": 0.02825270881312333,
+          "ZeroCrossRate": 0.19530080814127507,
+          "PeakFreq": 555.556640625,
+          "FundamentalFreq": 480.9995179768828,
+          "Pitch": 480.9995179768828,
+          "SpectralCentroid": 1329.3978435253155,
+          "SpectralRolloff": 1942.294921875
+        }
+      }
+    ],
+    "ask": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask_for_hunting.mp3",
+        "Emotion": "ask",
+        "Features": {
+          "Duration": 2.455510204081633,
+          "Energy": 0.2138722254301069,
+          "RootMeanSquare": 0.004444091758592213,
+          "ZeroCrossRate": 0.14581217102225505,
+          "PeakFreq": 111.97265625,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1228.7763519527227,
+          "SpectralRolloff": 1959.521484375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\ask_for_play.mp3",
+        "Emotion": "ask",
+        "Features": {
+          "Duration": 9.95265306122449,
+          "Energy": 21.06881898358096,
+          "RootMeanSquare": 0.021909244937959472,
+          "ZeroCrossRate": 0.22614599471429872,
+          "PeakFreq": 1888.4619140625,
+          "FundamentalFreq": 409.45897907712646,
+          "Pitch": 409.45897907712646,
+          "SpectralCentroid": 425.4840175344566,
+          "SpectralRolloff": 973.30078125
+        }
+      }
+    ],
+    "call": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 11.258775510204082,
+          "Energy": 48.03700332849251,
+          "RootMeanSquare": 0.0311042389941686,
+          "ZeroCrossRate": 0.10219125110770966,
+          "PeakFreq": 544.7900390625,
+          "FundamentalFreq": 368.4541600202524,
+          "Pitch": 368.4541600202524,
+          "SpectralCentroid": 483.9005479011204,
+          "SpectralRolloff": 981.9140625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call_1.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 1.1493877551020408,
+          "Energy": 11.162126500293159,
+          "RootMeanSquare": 0.046925869058331696,
+          "ZeroCrossRate": 0.11323732491615704,
+          "PeakFreq": 482.34375,
+          "FundamentalFreq": 416.0913684755053,
+          "Pitch": 416.0913684755053,
+          "SpectralCentroid": 646.9671204607998,
+          "SpectralRolloff": 947.4609375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call_2.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 1.2277551020408164,
+          "Energy": 10.130096148604876,
+          "RootMeanSquare": 0.04325213533679044,
+          "ZeroCrossRate": 0.13019390581717452,
+          "PeakFreq": 538.330078125,
+          "FundamentalFreq": 464.171396978188,
+          "Pitch": 464.171396978188,
+          "SpectralCentroid": 658.6008077203275,
+          "SpectralRolloff": 986.220703125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call_3.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 1.0971428571428572,
+          "Energy": 16.713949568085287,
+          "RootMeanSquare": 0.058770817618361816,
+          "ZeroCrossRate": 0.11655300681959083,
+          "PeakFreq": 544.7900390625,
+          "FundamentalFreq": 537.1346465165376,
+          "Pitch": 537.1346465165376,
+          "SpectralCentroid": 679.1829510479681,
+          "SpectralRolloff": 1018.5205078125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call_4.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 1.3061224489795917,
+          "Energy": 20.74089024005942,
+          "RootMeanSquare": 0.06000707458300493,
+          "ZeroCrossRate": 0.11927083333333334,
+          "PeakFreq": 529.716796875,
+          "FundamentalFreq": 495.86384760811137,
+          "Pitch": 495.86384760811137,
+          "SpectralCentroid": 715.4032018541745,
+          "SpectralRolloff": 1063.740234375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\call_5.mp3",
+        "Emotion": "call",
+        "Features": {
+          "Duration": 1.3322448979591837,
+          "Energy": 12.540514161556375,
+          "RootMeanSquare": 0.04619731956711975,
+          "ZeroCrossRate": 0.14499659632402995,
+          "PeakFreq": 536.1767578125,
+          "FundamentalFreq": 535.2885239868849,
+          "Pitch": 535.2885239868849,
+          "SpectralCentroid": 735.629470767145,
+          "SpectralRolloff": 1068.046875
+        }
+      }
+    ],
+    "comfortable": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\comfortable_1.mp3",
+        "Emotion": "comfortable",
+        "Features": {
+          "Duration": 4.2057142857142855,
+          "Energy": 0.13694222883667595,
+          "RootMeanSquare": 0.002717190906049847,
+          "ZeroCrossRate": 0.10453957299978435,
+          "PeakFreq": 75.3662109375,
+          "FundamentalFreq": 635.0154341775699,
+          "Pitch": 635.0154341775699,
+          "SpectralCentroid": 391.99980757207993,
+          "SpectralRolloff": 895.78125
+        }
+      }
+    ],
+    "courtship": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\courtship.mp3",
+        "Emotion": "courtship",
+        "Features": {
+          "Duration": 6.1387755102040815,
+          "Energy": 150.95537388419248,
+          "RootMeanSquare": 0.0746730892143511,
+          "ZeroCrossRate": 0.2818040780141844,
+          "PeakFreq": 1686.0498046875,
+          "FundamentalFreq": 613.9633612955713,
+          "Pitch": 613.9633612955713,
+          "SpectralCentroid": 1547.3653376714885,
+          "SpectralRolloff": 1933.681640625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\courtship_1.mp3",
+        "Emotion": "courtship",
+        "Features": {
+          "Duration": 2.063673469387755,
+          "Energy": 43.2390701198741,
+          "RootMeanSquare": 0.06892767279156665,
+          "ZeroCrossRate": 0.31326227887045377,
+          "PeakFreq": 1522.3974609375,
+          "FundamentalFreq": 690.658172439562,
+          "Pitch": 690.658172439562,
+          "SpectralCentroid": 1535.6088109078319,
+          "SpectralRolloff": 1909.9951171875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\courtship_2.mp3",
+        "Emotion": "courtship",
+        "Features": {
+          "Duration": 2.9518367346938774,
+          "Energy": 68.2126598938634,
+          "RootMeanSquare": 0.07238696344024598,
+          "ZeroCrossRate": 0.277769242587187,
+          "PeakFreq": 1744.189453125,
+          "FundamentalFreq": 781.5826720129714,
+          "Pitch": 781.5826720129714,
+          "SpectralCentroid": 764.5310526782271,
+          "SpectralRolloff": 1658.056640625
+        }
+      }
+    ],
+    "curious": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\curious.mp3",
+        "Emotion": "curious",
+        "Features": {
+          "Duration": 4.780408163265306,
+          "Energy": 3.9038628245077653,
+          "RootMeanSquare": 0.013607908171692298,
+          "ZeroCrossRate": 0.18930841476140783,
+          "PeakFreq": 1937.98828125,
+          "FundamentalFreq": 76.88991183733967,
+          "Pitch": 76.88991183733967,
+          "SpectralCentroid": 1098.265615572456,
+          "SpectralRolloff": 1858.3154296875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\curious_1.mp3",
+        "Emotion": "curious",
+        "Features": {
+          "Duration": 0.7575510204081632,
+          "Energy": 1.1244662664464526,
+          "RootMeanSquare": 0.018345729166295264,
+          "ZeroCrossRate": 0.2490272373540856,
+          "PeakFreq": 1408.271484375,
+          "FundamentalFreq": 1566.2866899977494,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1330.9048669911656,
+          "SpectralRolloff": 1879.8486328125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\curious_2.mp3",
+        "Emotion": "curious",
+        "Features": {
+          "Duration": 0.8359183673469388,
+          "Energy": 2.9246646998249184,
+          "RootMeanSquare": 0.028164462850850735,
+          "ZeroCrossRate": 0.3195009492812585,
+          "PeakFreq": 1937.98828125,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1377.4048622996183,
+          "SpectralRolloff": 1869.08203125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\curious_3.mp3",
+        "Emotion": "curious",
+        "Features": {
+          "Duration": 0.9404081632653061,
+          "Energy": 2.841289668143447,
+          "RootMeanSquare": 0.02617208862113488,
+          "ZeroCrossRate": 0.3541465766634523,
+          "PeakFreq": 1970.2880859375,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1461.5086654853956,
+          "SpectralRolloff": 2030.5810546875
+        }
+      }
+    ],
+    "dieaway": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\dieaway.mp3",
+        "Emotion": "dieaway",
+        "Features": {
+          "Duration": 2.8212244897959184,
+          "Energy": 0.2819307171247294,
+          "RootMeanSquare": 0.00476020985926609,
+          "ZeroCrossRate": 0.17320366500562612,
+          "PeakFreq": 501.7236328125,
+          "FundamentalFreq": 165.1787892615066,
+          "Pitch": 165.1787892615066,
+          "SpectralCentroid": 1051.3522648590688,
+          "SpectralRolloff": 1750.6494140625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\dieaway_1.mp3",
+        "Emotion": "dieaway",
+        "Features": {
+          "Duration": 0.9142857142857143,
+          "Energy": 0.09847727211234863,
+          "RootMeanSquare": 0.004942056921481766,
+          "ZeroCrossRate": 0.22321428571428573,
+          "PeakFreq": 1414.7314453125,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1090.4459085481803,
+          "SpectralRolloff": 1778.642578125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\dieaway_2.mp3",
+        "Emotion": "dieaway",
+        "Features": {
+          "Duration": 1.0710204081632653,
+          "Energy": 0.1556334000188797,
+          "RootMeanSquare": 0.0057397960120297,
+          "ZeroCrossRate": 0.2506350550381033,
+          "PeakFreq": 501.7236328125,
+          "FundamentalFreq": 245.22335976157325,
+          "Pitch": 245.22335976157325,
+          "SpectralCentroid": 1133.0605507397422,
+          "SpectralRolloff": 1810.9423828125
+        }
+      }
+    ],
+    "discomfort": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\discomfort.mp3",
+        "Emotion": "discomfort",
+        "Features": {
+          "Duration": 4.519183673469388,
+          "Energy": 1.9865357316553873,
+          "RootMeanSquare": 0.009983769396502418,
+          "ZeroCrossRate": 0.11886603110888108,
+          "PeakFreq": 546.943359375,
+          "FundamentalFreq": 442.7956002608128,
+          "Pitch": 442.7956002608128,
+          "SpectralCentroid": 471.4166635131686,
+          "SpectralRolloff": 1102.5
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\discomfort_1.mp3",
+        "Emotion": "discomfort",
+        "Features": {
+          "Duration": 1.5151020408163265,
+          "Energy": 1.885737480676867,
+          "RootMeanSquare": 0.01679915282297651,
+          "ZeroCrossRate": 0.14980544747081712,
+          "PeakFreq": 542.63671875,
+          "FundamentalFreq": 485.5753712319568,
+          "Pitch": 485.5753712319568,
+          "SpectralCentroid": 994.814372400756,
+          "SpectralRolloff": 1481.484375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\discomfort_2.mp3",
+        "Emotion": "discomfort",
+        "Features": {
+          "Duration": 1.6979591836734693,
+          "Energy": 1.5660602221377737,
+          "RootMeanSquare": 0.014461765378782888,
+          "ZeroCrossRate": 0.13314636752136752,
+          "PeakFreq": 557.7099609375,
+          "FundamentalFreq": 582.0869589820796,
+          "Pitch": 582.0869589820796,
+          "SpectralCentroid": 791.4634120497942,
+          "SpectralRolloff": 1365.205078125
+        }
+      }
+    ],
+    "find": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\find_mom.mp3",
+        "Emotion": "find",
+        "Features": {
+          "Duration": 9.560816326530611,
+          "Energy": 58.880438854810706,
+          "RootMeanSquare": 0.03736927023387807,
+          "ZeroCrossRate": 0.2749027606488948,
+          "PeakFreq": 1276.9189453125,
+          "FundamentalFreq": 744.1307934327696,
+          "Pitch": 744.1307934327696,
+          "SpectralCentroid": 1073.6285884285949,
+          "SpectralRolloff": 1533.1640625
+        }
+      }
+    ],
+    "flighty": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\flighty.mp3",
+        "Emotion": "flighty",
+        "Features": {
+          "Duration": 3.5787755102040815,
+          "Energy": 1.1879465731502465,
+          "RootMeanSquare": 0.008675683025829212,
+          "ZeroCrossRate": 0.1608059304314769,
+          "PeakFreq": 490.95703125,
+          "FundamentalFreq": 463.1608529756872,
+          "Pitch": 463.1608529756872,
+          "SpectralCentroid": 1037.4835772746865,
+          "SpectralRolloff": 1634.3701171875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\flighty_1.mp3",
+        "Emotion": "flighty",
+        "Features": {
+          "Duration": 1.0710204081632653,
+          "Energy": 1.9976003798140485,
+          "RootMeanSquare": 0.020563610134717605,
+          "ZeroCrossRate": 0.19623200677392041,
+          "PeakFreq": 542.63671875,
+          "FundamentalFreq": 468.83785312872067,
+          "Pitch": 468.83785312872067,
+          "SpectralCentroid": 1092.1681505287177,
+          "SpectralRolloff": 1763.5693359375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\flighty_2.mp3",
+        "Emotion": "flighty",
+        "Features": {
+          "Duration": 1.3061224489795917,
+          "Energy": 1.2364417977042632,
+          "RootMeanSquare": 0.014651280978933439,
+          "ZeroCrossRate": 0.19409722222222223,
+          "PeakFreq": 490.95703125,
+          "FundamentalFreq": 439.6460232353016,
+          "Pitch": 439.6460232353016,
+          "SpectralCentroid": 965.7011581120017,
+          "SpectralRolloff": 1436.2646484375
+        }
+      }
+    ],
+    "for_fight": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for-fight_1.mp3",
+        "Emotion": "for_fight",
+        "Features": {
+          "Duration": 1.4628571428571429,
+          "Energy": 37.09986398195744,
+          "RootMeanSquare": 0.07582963740628629,
+          "ZeroCrossRate": 0.33245505269683817,
+          "PeakFreq": 1427.6513671875,
+          "FundamentalFreq": 1376.0636347684067,
+          "Pitch": 1376.0636347684067,
+          "SpectralCentroid": 1368.7548119885537,
+          "SpectralRolloff": 1931.5283203125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for-fight_2.mp3",
+        "Emotion": "for_fight",
+        "Features": {
+          "Duration": 1.906938775510204,
+          "Energy": 17.252070841438435,
+          "RootMeanSquare": 0.045292116788852275,
+          "ZeroCrossRate": 0.3436385255648038,
+          "PeakFreq": 1627.91015625,
+          "FundamentalFreq": 478.9064849461059,
+          "Pitch": 478.9064849461059,
+          "SpectralCentroid": 1219.2624851180285,
+          "SpectralRolloff": 1780.7958984375
+        }
+      }
+    ],
+    "for_food": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for-food_1.mp3",
+        "Emotion": "for_food",
+        "Features": {
+          "Duration": 0.7053061224489796,
+          "Energy": 0.41971948468941866,
+          "RootMeanSquare": 0.01161527669687258,
+          "ZeroCrossRate": 0.16297010607521698,
+          "PeakFreq": 1763.5693359375,
+          "FundamentalFreq": 243.47159205762523,
+          "Pitch": 243.47159205762523,
+          "SpectralCentroid": 1073.3810328039115,
+          "SpectralRolloff": 1959.521484375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for-food_2.mp3",
+        "Emotion": "for_food",
+        "Features": {
+          "Duration": 1.0971428571428572,
+          "Energy": 1.461383309475195,
+          "RootMeanSquare": 0.017378178766076346,
+          "ZeroCrossRate": 0.18764207480884482,
+          "PeakFreq": 598.623046875,
+          "FundamentalFreq": 288.31933992878436,
+          "Pitch": 288.31933992878436,
+          "SpectralCentroid": 868.5058838403374,
+          "SpectralRolloff": 1152.0263671875
+        }
+      }
+    ],
+    "for": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for_fight.mp3",
+        "Emotion": "for",
+        "Features": {
+          "Duration": 3.9183673469387754,
+          "Energy": 18.424584315222436,
+          "RootMeanSquare": 0.03265329260950631,
+          "ZeroCrossRate": 0.24849537037037037,
+          "PeakFreq": 1345.8251953125,
+          "FundamentalFreq": 439.52379061489233,
+          "Pitch": 439.52379061489233,
+          "SpectralCentroid": 1401.8086999321256,
+          "SpectralRolloff": 1942.294921875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\for_food.mp3",
+        "Emotion": "for",
+        "Features": {
+          "Duration": 6.530612244897959,
+          "Energy": 4.577377512547352,
+          "RootMeanSquare": 0.012607010715695928,
+          "ZeroCrossRate": 0.13489583333333333,
+          "PeakFreq": 1686.0498046875,
+          "FundamentalFreq": 195.6136898032796,
+          "Pitch": 195.6136898032796,
+          "SpectralCentroid": 843.9488992664775,
+          "SpectralRolloff": 1800.17578125
+        }
+      }
+    ],
+    "goaway": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goaway.mp3",
+        "Emotion": "goaway",
+        "Features": {
+          "Duration": 2.0114285714285716,
+          "Energy": 0.10189939184214496,
+          "RootMeanSquare": 0.0033892180167046466,
+          "ZeroCrossRate": 0.17157028519896292,
+          "PeakFreq": 1431.9580078125,
+          "FundamentalFreq": 1526.521748220832,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1283.2093198878858,
+          "SpectralRolloff": 1845.3955078125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goaway_1.mp3",
+        "Emotion": "goaway",
+        "Features": {
+          "Duration": 0.5485714285714286,
+          "Energy": 0.6585908166796066,
+          "RootMeanSquare": 0.0164968168314401,
+          "ZeroCrossRate": 0.2578512396694215,
+          "PeakFreq": 1345.8251953125,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1276.7179301780277,
+          "SpectralRolloff": 1841.0888671875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goaway_2.mp3",
+        "Emotion": "goaway",
+        "Features": {
+          "Duration": 0.5485714285714286,
+          "Energy": 0.48751650493842097,
+          "RootMeanSquare": 0.01419341753117351,
+          "ZeroCrossRate": 0.26487603305785123,
+          "PeakFreq": 1879.8486328125,
+          "FundamentalFreq": 1513.078242508277,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1283.06732444911,
+          "SpectralRolloff": 1830.322265625
+        }
+      }
+    ],
+    "goout": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goout.mp3",
+        "Emotion": "goout",
+        "Features": {
+          "Duration": 2.9257142857142857,
+          "Energy": 0.06766528679298063,
+          "RootMeanSquare": 0.0022900112443189516,
+          "ZeroCrossRate": 0.18584825234441602,
+          "PeakFreq": 99.052734375,
+          "FundamentalFreq": 73.85324110404657,
+          "Pitch": 73.85324110404657,
+          "SpectralCentroid": 1086.9311802159987,
+          "SpectralRolloff": 1785.1025390625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goout_1.mp3",
+        "Emotion": "goout",
+        "Features": {
+          "Duration": 0.8620408163265306,
+          "Energy": 0.15213821747127587,
+          "RootMeanSquare": 0.006325765750330771,
+          "ZeroCrossRate": 0.2569700157811678,
+          "PeakFreq": 120.5859375,
+          "FundamentalFreq": 0.0,
+          "Pitch": 0.0,
+          "SpectralCentroid": 1186.1534961297943,
+          "SpectralRolloff": 1821.708984375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\goout_2.mp3",
+        "Emotion": "goout",
+        "Features": {
+          "Duration": 0.7836734693877551,
+          "Energy": 0.1471009398972054,
+          "RootMeanSquare": 0.006524103721462769,
+          "ZeroCrossRate": 0.26880787037037035,
+          "PeakFreq": 893.6279296875,
+          "FundamentalFreq": 1008.8762109806265,
+          "Pitch": 1008.8762109806265,
+          "SpectralCentroid": 1217.5348544110198,
+          "SpectralRolloff": 1851.85546875
+        }
+      }
+    ],
+    "hello": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\hello.mp3",
+        "Emotion": "hello",
+        "Features": {
+          "Duration": 6.922448979591837,
+          "Energy": 1.03491990172043,
+          "RootMeanSquare": 0.005822428885129774,
+          "ZeroCrossRate": 0.0983687106918239,
+          "PeakFreq": 577.08984375,
+          "FundamentalFreq": 149.102846481557,
+          "Pitch": 149.102846481557,
+          "SpectralCentroid": 1413.1657719924417,
+          "SpectralRolloff": 1981.0546875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\hello_1.mp3",
+        "Emotion": "hello",
+        "Features": {
+          "Duration": 0.47020408163265304,
+          "Energy": 0.2776360477315254,
+          "RootMeanSquare": 0.01157000510771863,
+          "ZeroCrossRate": 0.20973963355834138,
+          "PeakFreq": 1197.24609375,
+          "FundamentalFreq": 231.27440515721597,
+          "Pitch": 231.27440515721597,
+          "SpectralCentroid": 1422.5691157816052,
+          "SpectralRolloff": 1985.361328125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\hello_2.mp3",
+        "Emotion": "hello",
+        "Features": {
+          "Duration": 0.6791836734693878,
+          "Energy": 0.7341160331213046,
+          "RootMeanSquare": 0.015653499729415356,
+          "ZeroCrossRate": 0.1972630173564753,
+          "PeakFreq": 562.0166015625,
+          "FundamentalFreq": 378.7658919954744,
+          "Pitch": 378.7658919954744,
+          "SpectralCentroid": 1176.5857655761545,
+          "SpectralRolloff": 1798.0224609375
+        }
+      }
+    ],
+    "satisfy": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\satisfy.mp3",
+        "Emotion": "satisfy",
+        "Features": {
+          "Duration": 3.6048979591836736,
+          "Energy": 1.9687493859021417,
+          "RootMeanSquare": 0.011128175636045375,
+          "ZeroCrossRate": 0.14882375141527235,
+          "PeakFreq": 598.623046875,
+          "FundamentalFreq": 538.6884416600116,
+          "Pitch": 538.6884416600116,
+          "SpectralCentroid": 972.5150352874898,
+          "SpectralRolloff": 1507.32421875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\satisfy_1.mp3",
+        "Emotion": "satisfy",
+        "Features": {
+          "Duration": 1.253877551020408,
+          "Energy": 1.5712602267044078,
+          "RootMeanSquare": 0.016856270540867253,
+          "ZeroCrossRate": 0.19077757685352623,
+          "PeakFreq": 549.0966796875,
+          "FundamentalFreq": 453.38129704415104,
+          "Pitch": 453.38129704415104,
+          "SpectralCentroid": 1040.670870113124,
+          "SpectralRolloff": 1556.8505859375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\satisfy_2.mp3",
+        "Emotion": "satisfy",
+        "Features": {
+          "Duration": 1.5151020408163265,
+          "Energy": 2.158082115134496,
+          "RootMeanSquare": 0.017971351853687624,
+          "ZeroCrossRate": 0.22313678539359474,
+          "PeakFreq": 598.623046875,
+          "FundamentalFreq": 577.0360120075524,
+          "Pitch": 577.0360120075524,
+          "SpectralCentroid": 1130.7818801732205,
+          "SpectralRolloff": 1642.9833984375
+        }
+      }
+    ],
+    "unhappy": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\unhappy.mp3",
+        "Emotion": "unhappy",
+        "Features": {
+          "Duration": 3.0563265306122447,
+          "Energy": 5.082989306637817,
+          "RootMeanSquare": 0.019419174368599818,
+          "ZeroCrossRate": 0.2897841086133986,
+          "PeakFreq": 1916.455078125,
+          "FundamentalFreq": 675.9402180009996,
+          "Pitch": 675.9402180009996,
+          "SpectralCentroid": 1300.005524493305,
+          "SpectralRolloff": 1942.294921875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\unhappy_1.mp3",
+        "Emotion": "unhappy",
+        "Features": {
+          "Duration": 1.28,
+          "Energy": 5.179052036509551,
+          "RootMeanSquare": 0.03028957391798012,
+          "ZeroCrossRate": 0.30150575730735163,
+          "PeakFreq": 1890.615234375,
+          "FundamentalFreq": 857.6655622860227,
+          "Pitch": 857.6655622860227,
+          "SpectralCentroid": 1234.3553215306015,
+          "SpectralRolloff": 1940.1416015625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\unhappy_2.mp3",
+        "Emotion": "unhappy",
+        "Features": {
+          "Duration": 1.3844897959183673,
+          "Energy": 5.246476029051031,
+          "RootMeanSquare": 0.029312674569953432,
+          "ZeroCrossRate": 0.32148706190632165,
+          "PeakFreq": 1918.6083984375,
+          "FundamentalFreq": 697.8825734473702,
+          "Pitch": 697.8825734473702,
+          "SpectralCentroid": 1189.4783507718284,
+          "SpectralRolloff": 1877.6953125
+        }
+      }
+    ],
+    "warning": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\warning.mp3",
+        "Emotion": "warning",
+        "Features": {
+          "Duration": 4.284081632653061,
+          "Energy": 88.40588353282752,
+          "RootMeanSquare": 0.06840535831921858,
+          "ZeroCrossRate": 0.12306145133118086,
+          "PeakFreq": 572.783203125,
+          "FundamentalFreq": 497.113987716476,
+          "Pitch": 497.113987716476,
+          "SpectralCentroid": 694.2357483693426,
+          "SpectralRolloff": 1031.4404296875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\warning_1.mp3",
+        "Emotion": "warning",
+        "Features": {
+          "Duration": 2.403265306122449,
+          "Energy": 83.7702992339297,
+          "RootMeanSquare": 0.08890221617776478,
+          "ZeroCrossRate": 0.1180300028304557,
+          "PeakFreq": 572.783203125,
+          "FundamentalFreq": 511.2715357711046,
+          "Pitch": 511.2715357711046,
+          "SpectralCentroid": 674.2194438211052,
+          "SpectralRolloff": 1027.1337890625
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\warning_2.mp3",
+        "Emotion": "warning",
+        "Features": {
+          "Duration": 1.8546938775510204,
+          "Energy": 67.33325624571444,
+          "RootMeanSquare": 0.09072733556537134,
+          "ZeroCrossRate": 0.12420537897310513,
+          "PeakFreq": 581.396484375,
+          "FundamentalFreq": 517.9415535684502,
+          "Pitch": 517.9415535684502,
+          "SpectralCentroid": 643.041017048298,
+          "SpectralRolloff": 960.380859375
+        }
+      }
+    ],
+    "yummy": [
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\yummy.mp3",
+        "Emotion": "yummy",
+        "Features": {
+          "Duration": 4.519183673469388,
+          "Energy": 8.435613494372044,
+          "RootMeanSquare": 0.020573334490080718,
+          "ZeroCrossRate": 0.16668339187155043,
+          "PeakFreq": 473.73046875,
+          "FundamentalFreq": 375.34441020283737,
+          "Pitch": 375.34441020283737,
+          "SpectralCentroid": 970.021040706135,
+          "SpectralRolloff": 1642.9833984375
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\yummy_1.mp3",
+        "Emotion": "yummy",
+        "Features": {
+          "Duration": 1.1493877551020408,
+          "Energy": 2.281095230748728,
+          "RootMeanSquare": 0.021213413751967825,
+          "ZeroCrossRate": 0.15289011639376604,
+          "PeakFreq": 452.197265625,
+          "FundamentalFreq": 269.2460915045083,
+          "Pitch": 269.2460915045083,
+          "SpectralCentroid": 552.9662958223952,
+          "SpectralRolloff": 1272.6123046875
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\yummy_2.mp3",
+        "Emotion": "yummy",
+        "Features": {
+          "Duration": 1.0187755102040816,
+          "Energy": 4.333899971427416,
+          "RootMeanSquare": 0.031057838863469273,
+          "ZeroCrossRate": 0.14689517026485643,
+          "PeakFreq": 490.95703125,
+          "FundamentalFreq": 424.9185419236311,
+          "Pitch": 424.9185419236311,
+          "SpectralCentroid": 765.8604342392119,
+          "SpectralRolloff": 1414.7314453125
+        }
+      },
+      {
+        "FilePath": "d:\\uso_dev\\MeowTalk\\audios\\yummy_3.mp3",
+        "Emotion": "yummy",
+        "Features": {
+          "Duration": 1.1755102040816328,
+          "Energy": 4.774598134943636,
+          "RootMeanSquare": 0.03034840810975472,
+          "ZeroCrossRate": 0.21219135802469136,
+          "PeakFreq": 508.18359375,
+          "FundamentalFreq": 411.06566581689293,
+          "Pitch": 411.06566581689293,
+          "SpectralCentroid": 895.0038712406476,
+          "SpectralRolloff": 1515.9375
+        }
+      }
+    ]
+  }
+}
