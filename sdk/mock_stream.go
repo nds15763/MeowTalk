@@ -261,12 +261,9 @@ func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 		return AudioFeatures{} // 返回空特征
 	}
 
-	// 找出具有最高能量的窗口和平均音高/持续时间
+	// 找出具有最高能量的窗口
 	maxEnergy := 0.0
 	maxEnergyIndex := 0
-	totalPitch := 0.0
-	pitchCount := 0
-	avgDuration := 0.0
 
 	for i, feature := range windowResults {
 		// 跟踪最高能量
@@ -274,47 +271,31 @@ func extractFinalFeatures(windowResults []AudioFeature) AudioFeatures {
 			maxEnergy = feature.Energy
 			maxEnergyIndex = i
 		}
-
-		// 累加有效音高值
-		if feature.Pitch > 0 {
-			totalPitch += feature.Pitch
-			pitchCount++
-		}
-
-		// 累加其他特征值
-		if feature.Duration > 0 {
-			avgDuration += feature.Duration
-		}
 	}
 
-	// 计算平均值
-	avgPitch := 0.0
-	if pitchCount > 0 {
-		avgPitch = totalPitch / float64(pitchCount)
-	}
-
-	featureCount := len(windowResults)
-	if featureCount > 0 {
-		avgDuration = avgDuration / float64(featureCount)
-	}
-
-	// 获取最高能量窗口的其他特征
+	// 获取最高能量窗口的所有特征
 	bestFeature := windowResults[maxEnergyIndex]
 
 	log.Printf("使用最高能量窗口的特征: 窗口#%d，能量=%.6f", maxEnergyIndex, maxEnergy)
 
-	// 构建最终特征，使用最高能量窗口的特征值
-	return AudioFeatures{
+	// 构建最终特征，主要使用最高能量窗口的特征值
+	finalFeatures := AudioFeatures{
 		Energy:           maxEnergy,
-		Pitch:            avgPitch,                  // 使用平均音高，因为单个窗口的音高可能不稳定
-		Duration:         avgDuration,               // 使用平均持续时间
-		ZeroCrossRate:    bestFeature.ZeroCrossRate, // 使用最高能量窗口的特征
-		RootMeanSquare:   bestFeature.RootMeanSquare,
-		PeakFreq:         bestFeature.PeakFreq,
-		SpectralCentroid: bestFeature.SpectralCentroid,
-		SpectralRolloff:  bestFeature.SpectralRolloff,
-		FundamentalFreq:  bestFeature.FundamentalFreq,
+		Pitch:            bestFeature.Pitch,            // 使用最高能量窗口的音高，确保与其它特征一致
+		Duration:         bestFeature.Duration,         // 使用最高能量窗口的持续时间
+		ZeroCrossRate:    bestFeature.ZeroCrossRate,    // 使用最高能量窗口的过零率
+		RootMeanSquare:   bestFeature.RootMeanSquare,   // 使用最高能量窗口的均方根
+		PeakFreq:         bestFeature.PeakFreq,         // 使用最高能量窗口的峰值频率
+		SpectralCentroid: bestFeature.SpectralCentroid, // 使用最高能量窗口的频谱质心
+		SpectralRolloff:  bestFeature.SpectralRolloff,  // 使用最高能量窗口的频谱滚降点
+		FundamentalFreq:  bestFeature.FundamentalFreq,  // 使用最高能量窗口的基频
 	}
+
+	log.Printf("最终提取的关键特征 - 音高: %.2f Hz, 基频: %.2f Hz, RMS: %.6f, ZCR: %.6f, 峰值频率: %.2f Hz",
+		finalFeatures.Pitch, finalFeatures.FundamentalFreq, finalFeatures.RootMeanSquare,
+		finalFeatures.ZeroCrossRate, finalFeatures.PeakFreq)
+
+	return finalFeatures
 }
 
 // AudioFeature 详细的音频特征
@@ -333,7 +314,7 @@ type AudioFeature struct {
 	Duration         float64 // 持续时间
 }
 
-// extractAudioFeatures 提取音频特征
+// 从窗口数据中提取音频特征
 func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, startTime float64, endTime float64) AudioFeature {
 	var features AudioFeature
 
@@ -342,23 +323,31 @@ func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, start
 	features.StartTime = startTime
 	features.EndTime = endTime
 
-	// 计算持续时间（秒）
-	features.Duration = float64(len(data)) / float64(sampleRate)
+	// 计算持续时间（秒），考虑降采样因子
+	features.Duration = float64(len(data)*10) / float64(sampleRate)
+	log.Printf("持续时间计算: 数据点数=%d, 有效采样率=%d, 计算结果=%.3f秒",
+		len(data), sampleRate/10, features.Duration)
 
 	// 计算过零率
 	features.ZeroCrossRate = calculateZeroCrossRate(data)
 
 	// 计算能量
 	features.Energy = calculateEnergy(data)
+	log.Printf("能量计算: 总能量=%.6f, 数据点数=%d", features.Energy, len(data))
 
 	// 计算均方根值
-	features.RootMeanSquare = math.Sqrt(features.Energy)
+	features.RootMeanSquare = math.Sqrt(features.Energy / float64(len(data)))
+	log.Printf("均方根计算: 能量=%.6f, 数据点数=%d, RMS=%.6f",
+		features.Energy, len(data), features.RootMeanSquare)
 
-	// 计算峰值频率
-	features.PeakFreq = calculatePeakFrequency(data, sampleRate)
+	// 应用窗函数并进行频域分析 - 使用预处理后的数据进行频域分析
+	windowedData := applyHammingWindow(data)
+
+	// 计算峰值频率 - 使用窗函数处理后的数据
+	features.PeakFreq = calculatePeakFrequency(windowedData, sampleRate)
 
 	// 计算频谱
-	spectrum := performFFT(data)
+	spectrum := performFFT(windowedData)
 
 	// 计算频谱质心
 	features.SpectralCentroid = calculateSpectralCentroid(spectrum)
@@ -366,18 +355,60 @@ func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, start
 	// 计算频谱滚降点
 	features.SpectralRolloff = calculateSpectralRolloff(spectrum)
 
-	// 计算基频
-	features.FundamentalFreq = estimateFundamentalFrequency(data)
+	// 计算基频 - 使用预处理后的数据
+	features.FundamentalFreq = estimateFundamentalFrequency(windowedData)
 
 	// 估计音高
-	features.Pitch = estimatePitch(data, sampleRate)
+	features.Pitch = estimatePitch(windowedData, sampleRate)
+
+	// 进行特征验证 - 确保所有特征在合理范围内
+	validateFeatures(&features)
 
 	// 记录提取的特征数据
-	log.Printf("窗口 #%d (%.2f-%.2f秒): 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2fs, ZCR=%.2f",
+	log.Printf("窗口 #%d (%.2f-%.2f秒) 特征: 能量=%.2f, RMS=%.6f, 音高=%.2f Hz, 基频=%.2f Hz, 峰值频率=%.2f Hz, 谱质心=%.2f, 过零率=%.4f, 持续时间=%.3fs",
 		features.WindowIndex, features.StartTime, features.EndTime,
-		features.Energy, features.Pitch, features.Duration, features.ZeroCrossRate)
+		features.Energy, features.RootMeanSquare, features.Pitch, features.FundamentalFreq,
+		features.PeakFreq, features.SpectralCentroid, features.ZeroCrossRate, features.Duration)
 
 	return features
+}
+
+// validateFeatures 验证计算的特征是否合理
+func validateFeatures(features *AudioFeature) {
+	// 检查特征的有效性，确保没有不合理的值
+
+	// 1. 检查能量和RMS
+	if features.Energy < 0 {
+		log.Printf("警告: 能量值异常 (%.6f)", features.Energy)
+		features.Energy = 0
+	}
+
+	if features.RootMeanSquare < 0 {
+		log.Printf("警告: RMS值异常 (%.6f)", features.RootMeanSquare)
+		features.RootMeanSquare = 0
+	}
+
+	// 2. 检查频率相关特征
+	if features.Pitch > 0 && (features.Pitch < 70 || features.Pitch > 1500) {
+		log.Printf("警告: 音高值超出猫咪声音合理范围 (%.2f Hz)", features.Pitch)
+		features.Pitch = 0
+	}
+
+	if features.PeakFreq > 0 && (features.PeakFreq < 70 || features.PeakFreq > 2000) {
+		log.Printf("警告: 峰值频率超出合理范围 (%.2f Hz)", features.PeakFreq)
+		features.PeakFreq = 0
+	}
+
+	// 3. 确保基频和音高一致性
+	if features.FundamentalFreq > 0 && features.Pitch > 0 {
+		// 检查两者差异
+		diff := math.Abs(features.FundamentalFreq - features.Pitch)
+		if diff > 1.0 {
+			log.Printf("警告: 基频(%.2f Hz)与音高(%.2f Hz)不一致", features.FundamentalFreq, features.Pitch)
+			// 使用基频作为准确值
+			features.Pitch = features.FundamentalFreq
+		}
+	}
 }
 
 // applyHammingWindow 应用汉明窗函数
@@ -393,61 +424,176 @@ func applyHammingWindow(data []float64) []float64 {
 
 // calculatePeakFrequency 计算峰值频率
 func calculatePeakFrequency(data []float64, sampleRate int) float64 {
+	if len(data) == 0 {
+		return 0.0
+	}
+
 	// 执行FFT
 	fft := performFFT(data)
 
-	// 寻找峰值频率
+	// 考虑降采样因子，使用有效采样率
+	effectiveSampleRate := sampleRate / 10 // 考虑降采样因子
+	minFreq := 70.0                        // 最小频率为70Hz（猫咪声音的下限）
+	minBin := int(minFreq * float64(len(fft)) / float64(effectiveSampleRate))
+
+	// 查找峰值
 	maxMagnitude := 0.0
 	peakBin := 0
-	for i := 0; i < len(fft)/2; i++ {
+
+	// 从FFT结果中查找，忽略过低频率
+	for i := max(1, minBin); i < len(fft)/2; i++ {
+		// 计算当前bin对应的频率
+		freq := float64(i) * float64(effectiveSampleRate) / float64(len(fft))
+
 		magnitude := cmplx.Abs(fft[i])
-		if magnitude > maxMagnitude {
+		// 只考虑特定频率范围内的峰值，猫咪声音主要在70Hz-2000Hz之间
+		if freq >= 70.0 && freq <= 2000.0 && magnitude > maxMagnitude {
 			maxMagnitude = magnitude
 			peakBin = i
 		}
 	}
 
-	// 转换为频率
-	return float64(peakBin) * float64(sampleRate) / float64(len(fft))
+	// 检查峰值是否显著
+	threshold := 0.05 * float64(len(data)) // 提高阈值以过滤噪声
+	if maxMagnitude < threshold || peakBin == 0 {
+		log.Printf("峰值频率计算: 未找到显著峰值，幅值(%.6f)低于阈值(%.6f)", maxMagnitude, threshold)
+		return 0.0 // 如果峰值不显著，返回0
+	}
+
+	// 转换为频率，使用有效采样率
+	frequency := float64(peakBin) * float64(effectiveSampleRate) / float64(len(fft))
+	log.Printf("峰值频率计算: bin=%d, 幅值=%.6f, 频率=%.2f Hz (有效采样率=%d Hz)", peakBin, maxMagnitude, frequency, effectiveSampleRate)
+	return frequency
 }
 
 // estimateFundamentalFrequency 估计基频
 func estimateFundamentalFrequency(data []float64) float64 {
 	// 使用自相关法
-	minLag := 44100 / 2000 // 最高2000Hz
-	maxLag := 44100 / 70   // 最低70Hz
+	effectiveSampleRate := 44100 / 10 // 采用实际降采样率 4410Hz
 
-	if len(data) < maxLag {
-		return 0
+	// 定义频率范围：70Hz-1000Hz (猫咪主要声音范围)
+	minLag := effectiveSampleRate / 1000 // 最高频率限制
+	maxLag := effectiveSampleRate / 70   // 最低频率限制
+
+	// 检查数据有效性
+	if len(data) < maxLag || maxLag <= minLag {
+		log.Printf("基频计算失败: 数据长度(%d)不足或单个周期时间范围无效[最小=%d, 最大=%d]",
+			len(data), minLag, maxLag)
+		return 0.0
 	}
 
+	// 步骤1: 预处理 - 中心化数据（移除直流分量）
+	mean := 0.0
+	for _, v := range data {
+		mean += v
+	}
+	mean /= float64(len(data))
+
+	centeredData := make([]float64, len(data))
+	for i, v := range data {
+		centeredData[i] = v - mean
+	}
+
+	// 步骤2: 归一化
+	dataMax := 0.0
+	for _, v := range centeredData {
+		if math.Abs(v) > dataMax {
+			dataMax = math.Abs(v)
+		}
+	}
+
+	normalizedData := make([]float64, len(data))
+	if dataMax > 0 {
+		for i, v := range centeredData {
+			normalizedData[i] = v / dataMax
+		}
+	} else {
+		log.Printf("基频计算警告: 信号强度过低")
+		return 0.0 // 信号强度太低，无法可靠检测
+	}
+
+	// 步骤3: 应用汉宁窗函数减少频谱泄漏
+	for i := range normalizedData {
+		// 汉宁窗: 0.5 * (1 - cos(2π*n/(N-1)))
+		window := 0.5 * (1.0 - math.Cos(2.0*math.Pi*float64(i)/float64(len(normalizedData)-1)))
+		normalizedData[i] *= window
+	}
+
+	// 步骤4: 计算自相关
 	maxCorr := 0.0
 	bestLag := 0
+	secondBestLag := 0
+	secondCorr := 0.0
 
-	// 计算自相关
+	// 先计算自相关的基准值（lag=0时的值）
+	baseCorr := 0.0
+	for i := 0; i < len(normalizedData); i++ {
+		baseCorr += normalizedData[i] * normalizedData[i]
+	}
+	baseCorr /= float64(len(normalizedData))
+
+	if baseCorr <= 0 {
+		log.Printf("基频计算警告: 基准相关值无效 (%.6f)", baseCorr)
+		return 0.0
+	}
+
 	for lag := minLag; lag <= maxLag; lag++ {
 		corr := 0.0
-		for i := 0; i < len(data)-lag; i++ {
-			corr += data[i] * data[i+lag]
+		for i := 0; i < len(normalizedData)-lag; i++ {
+			corr += normalizedData[i] * normalizedData[i+lag]
 		}
-		corr = corr / float64(len(data)-lag)
+
+		// 归一化相关系数
+		corr = corr / float64(len(normalizedData)-lag) / baseCorr
 
 		if corr > maxCorr {
+			secondCorr = maxCorr
+			secondBestLag = bestLag
 			maxCorr = corr
 			bestLag = lag
+		} else if corr > secondCorr {
+			secondCorr = corr
+			secondBestLag = lag
 		}
 	}
 
-	if bestLag > 0 {
-		return float64(44100) / float64(bestLag)
+	// 步骤5: 结果验证
+	// 提高相关性阈值要求
+	minCorrThreshold := 0.25 // 相关性阈值调高
+	if maxCorr < minCorrThreshold {
+		log.Printf("基频计算: 相关性太低(%.4f < %.4f)，可能不存在明显的周期性信号", maxCorr, minCorrThreshold)
+		return 0.0
 	}
-	return 0
+
+	// 计算最终的频率值
+	fundamentalFreq := float64(effectiveSampleRate) / float64(bestLag)
+	log.Printf("基频计算: 最佳周期=%d点, 相关性=%.4f, 基频=%.2f Hz", bestLag, maxCorr, fundamentalFreq)
+
+	// 检查频率范围是否合理
+	if fundamentalFreq < 70.0 || fundamentalFreq > 1000.0 {
+		// 如果结果超出合理范围，看看次优结果是否更合理
+		if secondBestLag > 0 {
+			secondFreq := float64(effectiveSampleRate) / float64(secondBestLag)
+			if secondFreq >= 70.0 && secondFreq <= 1000.0 && secondCorr > minCorrThreshold {
+				log.Printf("基频调整: 选择次优周期=%d点, 相关性=%.4f, 频率=%.2f Hz (替代范围外值 %.2f Hz)",
+					secondBestLag, secondCorr, secondFreq, fundamentalFreq)
+				return secondFreq
+			}
+		}
+		log.Printf("基频计算警告: 结果超出合理范围 (%.2f Hz, 期望70-1000Hz)", fundamentalFreq)
+		return 0.0
+	}
+
+	return fundamentalFreq
 }
 
 // estimatePitch 估计音高
 func estimatePitch(data []float64, sampleRate int) float64 {
-	// 同样使用自相关法
-	return estimateFundamentalFrequency(data)
+	// 在MeowTalk中，音高与基频应当是相同的概念
+	// 直接使用基频计算结果作为音高
+	pitch := estimateFundamentalFrequency(data)
+	log.Printf("音高估计: 使用基频值 %.2f Hz", pitch)
+	return pitch
 }
 
 // performFFT 执行FFT
@@ -521,14 +667,38 @@ func calculateZeroCrossRate(data []float64) float64 {
 		return 0.0
 	}
 
+	// 预处理数据，移除直流分量
+	mean := 0.0
+	for _, sample := range data {
+		mean += sample
+	}
+	mean /= float64(len(data))
+
+	centeredData := make([]float64, len(data))
+	for i, sample := range data {
+		centeredData[i] = sample - mean
+	}
+
 	crossCount := 0.0
-	for i := 1; i < len(data); i++ {
-		if (data[i-1] >= 0 && data[i] < 0) || (data[i-1] < 0 && data[i] >= 0) {
+	for i := 1; i < len(centeredData); i++ {
+		if (centeredData[i-1] >= 0 && centeredData[i] < 0) || (centeredData[i-1] < 0 && centeredData[i] >= 0) {
 			crossCount++
 		}
 	}
 
-	return crossCount / float64(len(data)-1)
+	// 如果没有找到过零点，尝试使用原始数据
+	if crossCount == 0 {
+		for i := 1; i < len(data); i++ {
+			if (data[i-1] >= 0 && data[i] < 0) || (data[i-1] < 0 && data[i] >= 0) {
+				crossCount++
+			}
+		}
+	}
+
+	zcr := crossCount / float64(len(data)-1)
+	log.Printf("过零率计算: 找到 %.1f 个过零点, 过零率=%.6f", crossCount, zcr)
+
+	return zcr
 }
 
 // calculateEnergy 计算音频能量
@@ -542,7 +712,7 @@ func calculateEnergy(data []float64) float64 {
 		energy += sample * sample
 	}
 
-	return energy / float64(len(data))
+	return energy
 }
 
 // calculateSpectrum 计算频谱
@@ -620,7 +790,7 @@ func recognizeEmotion(features AudioFeatures) (string, float64) {
 	log.Printf("开始情感识别: 详细特征信息如下:")
 	log.Printf("  能量(Energy)=%.6f", features.Energy)
 	log.Printf("  音高(Pitch)=%.2f Hz", features.Pitch)
-	log.Printf("  持续时间(Duration)=%.2f 秒", features.Duration)
+	log.Printf("  持续时间(Duration)=%.2f秒", features.Duration)
 	log.Printf("  其他参考特征:")
 	log.Printf("  ZeroCrossRate=%.6f", features.ZeroCrossRate)
 	log.Printf("  RootMeanSquare=%.6f", features.RootMeanSquare)
@@ -881,8 +1051,6 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "无效请求格式", http.StatusBadRequest)
 		return
 	}
-
-	log.Printf("收到音频数据: StreamID=%s, 数据类型=%T", req.StreamID, req.Data)
 
 	// 转换音频数据
 	var audioData []float64
@@ -1328,9 +1496,7 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 	// 如果没有窗口结果，返回未知
 	if len(windowResults) == 0 {
 		return nil, AnalysisResult{
-			Status:     "no_features",
-			Emotion:    "unknown",
-			Confidence: 0,
+			Status: "no_features",
 		}
 	}
 
@@ -1365,4 +1531,12 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 		Emotion:    emotion,
 		Confidence: confidence,
 	}
+}
+
+// max 返回两个整数中较大的一个
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
