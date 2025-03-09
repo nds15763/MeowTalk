@@ -26,43 +26,51 @@ type AudioProcessor interface {
 type MockAudioProcessor struct {
 	sessions sync.Map
 	// 音频处理相关参数
-	audioBuffer       []float64    // 音频缓冲区
-	buffer            []float64    // 兼容旧代码的缓冲区
-	bufferMutex       sync.Mutex   // 缓冲区锁
-	minSilenceTime    float64      // 最小静默时间（秒）
-	silenceThreshold  float64      // 静默检测阈值
-	minProcessTime    float64      // 最小处理时间（秒）
-	maxBufferTime     float64      // 最大缓冲时间（秒）
-	lastProcessTime   time.Time    // 上次处理时间
-	sampleRate        int          // 采样率
-	recentResults     []MockResult // 最近的分析结果
-	continuousPattern bool         // 是否检测到连续模式
-	mu                sync.Mutex   // 锁
-	windowSize        int          // 滑动窗口大小（样本数）
-	stepSize          int          // 滑动窗口步进（样本数）
-	maxBufferSize     int          // 最大缓冲区大小（样本数）
-	currentStreamID   string       // 当前流ID
+	audioBuffer        []float64    // 音频缓冲区
+	buffer             []float64    // 兼容旧代码的缓冲区
+	bufferMutex        sync.Mutex   // 缓冲区锁
+	minSilenceTime     float64      // 最小静默时间（秒）
+	silenceThreshold   float64      // 静默检测阈值
+	minProcessTime     float64      // 最小处理时间（秒）
+	maxBufferTime      float64      // 最大缓冲时间（秒）
+	lastProcessTime    time.Time    // 上次处理时间
+	sampleRate         int          // 采样率
+	recentResults      []MockResult // 最近的分析结果
+	continuousPattern  bool         // 是否检测到连续模式
+	mu                 sync.Mutex   // 锁
+	windowSize         int          // 滑动窗口大小（样本数）
+	stepSize           int          // 滑动窗口步进（样本数）
+	maxBufferSize      int          // 最大缓冲区大小（样本数）
+	currentStreamID    string       // 当前流ID
+	frontendSampleRate int          // 前端采样率
 }
 
 // NewMockAudioProcessor 创建新的音频处理器
 func NewMockAudioProcessor() *MockAudioProcessor {
 	// 尝试加载样本库
-	err := loadSampleLibrary("sdk/new_sample_library.json")
+	err := loadSampleLibrary("new_sample_library.json")
 	if err != nil {
 		log.Printf("加载样本库失败: %v，将使用传统方法进行情感识别", err)
+	} else {
+		// 初始化波形模板库
+		err = initWaveformTemplates()
+		if err != nil {
+			log.Printf("初始化波形模板库失败: %v", err)
+		}
 	}
 
 	return &MockAudioProcessor{
-		silenceThreshold: 0.02,  // 静默阈值，根据实际情况调整
-		minSilenceTime:   0.3,   // 最小静默时间0.3秒
-		maxBufferTime:    5.0,   // 最大缓冲5秒
-		minProcessTime:   1.0,   // 最小处理时间1秒
-		sampleRate:       44100, // 默认采样率
-		recentResults:    make([]MockResult, 0, 5),
-		lastProcessTime:  time.Now(),
-		windowSize:       44100,  // 滑动窗口大小1秒(44100样本)
-		stepSize:         22050,  // 滑动窗口步进0.5秒(22050样本)（50%重叠）
-		maxBufferSize:    132300, // 最大缓冲区大小3秒(3*44100样本)
+		silenceThreshold:   0.02,  // 静默阈值，根据实际情况调整
+		minSilenceTime:     0.3,   // 最小静默时间0.3秒
+		maxBufferTime:      5.0,   // 最大缓冲5秒
+		minProcessTime:     1.0,   // 最小处理时间1秒
+		sampleRate:         44100, // 默认采样率
+		recentResults:      make([]MockResult, 0, 5),
+		lastProcessTime:    time.Now(),
+		windowSize:         44100,  // 滑动窗口大小1秒(44100样本)
+		stepSize:           22050,  // 滑动窗口步进0.5秒(22050样本)（50%重叠）
+		maxBufferSize:      132300, // 最大缓冲区大小3秒(3*44100样本)
+		frontendSampleRate: 4410,   // 前端采样率
 	}
 }
 
@@ -116,27 +124,31 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 		log.Printf("缓冲区超过最大限制 %d 样本，已截断", m.maxBufferSize)
 	}
 
-	// 注意：前端发送的是频域数据，而不是时域数据
-	// 这里暂时按照时域数据处理，但计算持续时间时需要考虑前端降采样因素
-	// 前端使用filter((_, index) => index % 10 === 0)进行了10倍降采样
-	// 因此实际时间应该是样本数 * 10 / 采样率
-	actualSampleCount := len(m.audioBuffer) * 10
-	bufferDuration := float64(actualSampleCount) / float64(m.sampleRate)
+	// 计算实际持续时间
+	// 注意：前端可能发送的是频域数据，而不是时域数据
+	// 计算实际持续时间时需要考虑前端降采样因素和采样率差异
+	// 前端采样率通常比后端低，这里取值4410Hz (假设前端使用44100Hz的1/10)
+	bufferDuration := float64(len(m.audioBuffer)) / float64(m.frontendSampleRate)
 	log.Printf("音频缓冲区：当前长度=%d 样本, 持续时间=%.2f秒", len(m.audioBuffer), bufferDuration)
 
 	// 确定是否需要处理音频
 	shouldProcess := false
 
 	// 检查是否有足够的窗口数量
+	// 注意：这里需要考虑前端和后端采样率的差异
+	scaleFactor := float64(m.sampleRate) / float64(m.frontendSampleRate)
+	adjustedWindowSize := int(float64(m.windowSize) / scaleFactor)
+	adjustedStepSize := int(float64(m.stepSize) / scaleFactor)
+
 	windowCount := 0
-	if len(m.audioBuffer) >= m.windowSize/10 { // 考虑降采样因素调整窗口大小比较
-		windowCount = 1 + (len(m.audioBuffer)-(m.windowSize/10))/(m.stepSize/10)
+	if len(m.audioBuffer) >= adjustedWindowSize {
+		windowCount = 1 + (len(m.audioBuffer)-adjustedWindowSize)/adjustedStepSize
 	}
 
 	// 条件1：至少形成3个完整窗口
 	if windowCount >= 3 {
 		shouldProcess = true
-		log.Printf("处理条件：已形成 %d 个滑动窗口", windowCount)
+		log.Printf("处理条件：已形成 %d 个滑动窗口（考虑采样率差异后的窗口大小=%d）", windowCount, adjustedWindowSize)
 	}
 
 	// 检查是否有足够长的静默段
@@ -175,8 +187,8 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 	// 处理音频数据
 	result, err := m.processBuffer(streamID, m.audioBuffer)
 
-	// 保留最后1个窗口大小的数据以保持连续性 (考虑降采样因素)
-	retainSamples := m.windowSize / 10
+	// 保留最后1个窗口大小的数据以保持连续性 (考虑采样率差异)
+	retainSamples := adjustedWindowSize
 	if len(m.audioBuffer) > retainSamples {
 		m.audioBuffer = m.audioBuffer[len(m.audioBuffer)-retainSamples:]
 		log.Printf("保留 %d 个样本以确保处理连续性", retainSamples)
@@ -331,9 +343,9 @@ func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, start
 	features.EndTime = endTime
 
 	// 计算持续时间（秒），考虑降采样因子
-	features.Duration = float64(len(data)*10) / float64(sampleRate)
+	features.Duration = float64(len(data)) / float64(sampleRate)
 	log.Printf("持续时间计算: 数据点数=%d, 有效采样率=%d, 计算结果=%.3f秒",
-		len(data), sampleRate/10, features.Duration)
+		len(data), sampleRate, features.Duration)
 
 	// 计算过零率
 	features.ZeroCrossRate = calculateZeroCrossRate(data)
@@ -439,8 +451,8 @@ func calculatePeakFrequency(data []float64, sampleRate int) float64 {
 	fft := performFFT(data)
 
 	// 考虑降采样因子，使用有效采样率
-	effectiveSampleRate := sampleRate / 10 // 考虑降采样因子
-	minFreq := 70.0                        // 最小频率为70Hz（猫咪声音的下限）
+	effectiveSampleRate := sampleRate // 使用原始采样率
+	minFreq := 70.0                   // 最小频率为70Hz（猫咪声音的下限）
 	minBin := int(minFreq * float64(len(fft)) / float64(effectiveSampleRate))
 
 	// 查找峰值
@@ -476,7 +488,7 @@ func calculatePeakFrequency(data []float64, sampleRate int) float64 {
 // estimateFundamentalFrequency 估计基频
 func estimateFundamentalFrequency(data []float64) float64 {
 	// 使用自相关法
-	effectiveSampleRate := 44100 / 10 // 采用实际降采样率 4410Hz
+	effectiveSampleRate := 44100 // 采用原始采样率
 
 	// 定义频率范围：70Hz-1000Hz (猫咪主要声音范围)
 	minLag := effectiveSampleRate / 1000 // 最高频率限制
@@ -1063,8 +1075,8 @@ func (m *MockAudioProcessor) saveProcessedAudio(streamID string, data []float64,
 		audioID, duration, emotion, confidence)
 
 	// 记录关键特征
-	log.Printf("音频特征[%s]: 能量=%.2f, 音高=%.2f Hz, 持续时间=%.2f秒",
-		audioID, features.Energy, features.Pitch, features.Duration)
+	log.Printf("音频特征[%s]: 能量=%.2f, 音高=%.2f Hz",
+		audioID, features.Energy, features.Pitch)
 
 	// 这里可以扩展为:
 	// 1. 保存音频数据到WAV文件
@@ -1635,8 +1647,28 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 	// 从多窗口分析结果中提取最终特征
 	finalFeatures := extractFinalFeatures(windowResults)
 
+	// 进行波形匹配
+	isCatMeow := false
+	waveformMatchEmotion := ""
+	waveformMatchConfidence := 0.0
+
+	isCatMeow, waveformMatchEmotion, waveformMatchConfidence = matchWaveform(finalFeatures)
+
 	// 从样本库匹配情感
 	emotion, confidence := recognizeEmotionWithSamples(finalFeatures)
+
+	// 如果波形匹配成功且置信度足够高，使用波形匹配结果
+	if isCatMeow && waveformMatchConfidence > 0.75 {
+		log.Printf("[%s] 采用波形匹配结果: %s (置信度: %.2f, 猫叫置信度: %.2f)",
+			streamID, waveformMatchEmotion, waveformMatchConfidence, 1.0)
+		emotion = waveformMatchEmotion
+		confidence = waveformMatchConfidence
+	}
+
+	log.Printf("[%s] 波形匹配结果: %s (置信度: %.2f)",
+		streamID, emotion, confidence)
+
+	log.Printf("[%s] 猫叫置信度: %.2f", streamID, confidence)
 
 	// 如果匹配置信度低，尝试使用AI分析
 	if confidence < 0.65 {
@@ -1656,7 +1688,7 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 		}
 	}
 
-	log.Printf("[%s] 情感分析结果: %s (置信度: %.2f)\n", streamID, emotion, confidence)
+	log.Printf("[%s] 最终识别结果: 情感=%s, 置信度=%.2f", streamID, emotion, confidence)
 
 	return windowResults, AnalysisResult{
 		Status:     "success",
@@ -1667,6 +1699,13 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 
 // max 返回两个整数中较大的一个
 func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func maxFloat(a, b float64) float64 {
 	if a > b {
 		return a
 	}
@@ -1713,4 +1752,304 @@ func loadSampleLibrary(filePath string) error {
 		library.TotalSamples, len(library.Emotions))
 
 	return nil
+}
+
+// WaveformTemplate 波形模板结构
+type WaveformTemplate struct {
+	Name     string        // 模板名称
+	Emotion  string        // 情感类别
+	Features AudioFeatures // 特征向量
+}
+
+// 全局波形模板库
+var waveformTemplates []WaveformTemplate
+
+// initWaveformTemplates 从样本库中初始化波形模板
+func initWaveformTemplates() error {
+	if sampleLibrary == nil {
+		return fmt.Errorf("样本库未加载")
+	}
+
+	log.Printf("开始初始化波形模板库...")
+	waveformTemplates = []WaveformTemplate{}
+
+	// 遍历样本库中的每个情感类别
+	for emotion, samples := range sampleLibrary.Samples {
+		if len(samples) == 0 {
+			continue
+		}
+
+		// 为每个情感类别创建一个波形模板
+		template := WaveformTemplate{
+			Name:     emotion,
+			Emotion:  emotion,
+			Features: calculateAverageFeatures(samples),
+		}
+
+		// 添加到全局模板库
+		waveformTemplates = append(waveformTemplates, template)
+		log.Printf("创建模板: %s，特征: %+v", emotion, template.Features)
+	}
+
+	log.Printf("波形模板库初始化完成，共 %d 个模板", len(waveformTemplates))
+	return nil
+}
+
+// calculateAverageFeatures 计算平均特征向量
+func calculateAverageFeatures(samples []SampleEntry) AudioFeatures {
+	var features AudioFeatures
+
+	count := 0
+	// 计算平均特征
+	for _, sample := range samples {
+		// 检查样本的有效性
+		if !isValidFeatures(sample.Features) {
+			continue
+		}
+
+		features.Energy += sample.Features.Energy
+		features.Pitch += sample.Features.Pitch
+		features.Duration += sample.Features.Duration
+		features.ZeroCrossRate += sample.Features.ZeroCrossRate
+		features.RootMeanSquare += sample.Features.RootMeanSquare
+		features.PeakFreq += sample.Features.PeakFreq
+		features.SpectralCentroid += sample.Features.SpectralCentroid
+		features.SpectralRolloff += sample.Features.SpectralRolloff
+		features.FundamentalFreq += sample.Features.FundamentalFreq
+		count++
+	}
+
+	if count == 0 {
+		return features
+	}
+
+	// 计算平均值
+	features.Energy /= float64(count)
+	features.Pitch /= float64(count)
+	features.Duration /= float64(count)
+	features.ZeroCrossRate /= float64(count)
+	features.RootMeanSquare /= float64(count)
+	features.PeakFreq /= float64(count)
+	features.SpectralCentroid /= float64(count)
+	features.SpectralRolloff /= float64(count)
+	features.FundamentalFreq /= float64(count)
+
+	return features
+}
+
+// isValidFeatures 检查特征是否有效
+func isValidFeatures(features AudioFeatures) bool {
+	// 检查各项特征是否为NaN或无限大
+	return !math.IsNaN(features.Energy) && !math.IsInf(features.Energy, 0) &&
+		!math.IsNaN(features.Pitch) && !math.IsInf(features.Pitch, 0) &&
+		!math.IsNaN(features.Duration) && !math.IsInf(features.Duration, 0) &&
+		!math.IsNaN(features.ZeroCrossRate) && !math.IsInf(features.ZeroCrossRate, 0) &&
+		!math.IsNaN(features.RootMeanSquare) && !math.IsInf(features.RootMeanSquare, 0) &&
+		!math.IsNaN(features.PeakFreq) && !math.IsInf(features.PeakFreq, 0) &&
+		!math.IsNaN(features.SpectralCentroid) && !math.IsInf(features.SpectralCentroid, 0) &&
+		!math.IsNaN(features.SpectralRolloff) && !math.IsInf(features.SpectralRolloff, 0) &&
+		!math.IsNaN(features.FundamentalFreq) && !math.IsInf(features.FundamentalFreq, 0)
+}
+
+// isCatMeow 专门判断是否为猫叫的函数
+func isCatMeow(features AudioFeatures) bool {
+	// 1. 能量阈值检查（猫叫通常有特定的能量范围）
+	energyValid := features.Energy >= 100 && features.Energy <= 1500
+
+	// 2. 基频范围检查（猫叫通常在200-800Hz范围内）
+	pitchValid := features.Pitch >= 200 && features.Pitch <= 800
+
+	// 3. 持续时间特征（猫叫通常有典型的持续时间范围，一般在0.5-3秒之间）
+	durationValid := features.Duration >= 0.5 && features.Duration <= 3.0
+
+	// 4. 谐波结构检查（猫叫的特征）
+	// 频谱质心在一定范围内，表示频谱的中心倾向于中频
+	centroidValid := features.SpectralCentroid >= 700 && features.SpectralCentroid <= 1800
+
+	// 5. 过零率检查（猫叫的过零率特征）
+	zeroCrossValid := features.ZeroCrossRate >= 0.1 && features.ZeroCrossRate <= 0.25
+
+	// 组合多个条件，至少满足3个条件才认为是猫叫
+	validCount := 0
+	if energyValid {
+		validCount++
+	}
+	if pitchValid {
+		validCount++
+	}
+	if durationValid {
+		validCount++
+	}
+	if centroidValid {
+		validCount++
+	}
+	if zeroCrossValid {
+		validCount++
+	}
+
+	log.Printf("猫叫检测结果: 能量=%v, 音高=%v, 持续时间=%v, 谐波结构=%v, 过零率=%v, 总得分=%d/5",
+		energyValid, pitchValid, durationValid, centroidValid, zeroCrossValid, validCount)
+
+	// 返回判断结果：至少满足3个条件认为是猫叫
+	return validCount >= 3
+}
+
+// matchWaveform 匹配波形
+func matchWaveform(features AudioFeatures) (bool, string, float64) {
+	// 首先使用专门的猫叫判断函数
+	isCatMeowResult := isCatMeow(features)
+
+	if !isCatMeowResult {
+		// 如果专门判断函数认为不是猫叫，则直接返回
+		log.Printf("通过特征组合判断：不是猫叫声")
+		return false, "", 0.0
+	}
+
+	log.Printf("通过特征组合判断：可能是猫叫声，继续进行模板匹配")
+
+	// 如果专门判断函数认为是猫叫，继续进行模板匹配
+	if len(waveformTemplates) == 0 {
+		log.Printf("波形模板库为空，无法进行匹配")
+		// 即使模板库为空，也返回是猫叫，但没有具体情感
+		return true, "unknown", 0.7
+	}
+
+	// 计算与每个模板的相似度
+	bestMatch := ""
+	bestScore := 0.0
+	threshold := 0.65 // 匹配阈值，可以根据实际情况调整
+
+	for _, template := range waveformTemplates {
+		score := calculateWaveformSimilarity(features, template.Features)
+		log.Printf("与模板 %s 的相似度: %.4f", template.Name, score)
+
+		if score > bestScore {
+			bestScore = score
+			bestMatch = template.Emotion
+		}
+	}
+
+	// 判断是否匹配猫叫
+	isCatMeow := bestScore >= threshold
+
+	log.Printf("波形匹配结果: 是否为猫叫=%v, 最佳匹配=%s, 相似度=%.4f",
+		isCatMeow, bestMatch, bestScore)
+
+	return true, bestMatch, maxFloat(bestScore, 0.7) // 确保至少返回0.7的置信度
+}
+
+// calculateWaveformSimilarity 计算波形相似度
+func calculateWaveformSimilarity(features1, features2 AudioFeatures) float64 {
+	// 计算特征向量之间的余弦相似度
+	// 将特征转换为向量
+	vector1 := []float64{
+		normalize(features1.Energy, 0, 1000),
+		normalize(features1.Pitch, 0, 1000),
+		normalize(features1.Duration, 0, 10),
+		features1.ZeroCrossRate,
+		features1.RootMeanSquare,
+		normalize(features1.PeakFreq, 0, 2000),
+		normalize(features1.SpectralCentroid, 0, 2000),
+		normalize(features1.SpectralRolloff, 0, 20000),
+		normalize(features1.FundamentalFreq, 0, 1000),
+	}
+
+	vector2 := []float64{
+		normalize(features2.Energy, 0, 1000),
+		normalize(features2.Pitch, 0, 1000),
+		normalize(features2.Duration, 0, 10),
+		features2.ZeroCrossRate,
+		features2.RootMeanSquare,
+		normalize(features2.PeakFreq, 0, 2000),
+		normalize(features2.SpectralCentroid, 0, 2000),
+		normalize(features2.SpectralRolloff, 0, 20000),
+		normalize(features2.FundamentalFreq, 0, 1000),
+	}
+
+	// 计算余弦相似度
+	return cosineSimilarity(vector1, vector2)
+}
+
+// normalize 归一化函数
+func normalize(value, min, max float64) float64 {
+	if value < min {
+		return 0
+	}
+	if value > max {
+		return 1
+	}
+	return (value - min) / (max - min)
+}
+
+// cosineSimilarity 计算余弦相似度
+func cosineSimilarity(a, b []float64) float64 {
+	if len(a) != len(b) {
+		return 0
+	}
+
+	var dotProduct, magnitudeA, magnitudeB float64
+
+	for i := 0; i < len(a); i++ {
+		dotProduct += a[i] * b[i]
+		magnitudeA += a[i] * a[i]
+		magnitudeB += b[i] * b[i]
+	}
+
+	magnitudeA = math.Sqrt(magnitudeA)
+	magnitudeB = math.Sqrt(magnitudeB)
+
+	if magnitudeA == 0 || magnitudeB == 0 {
+		return 0
+	}
+
+	return dotProduct / (magnitudeA * magnitudeB)
+}
+
+// dynamicTimeWarping 动态时间规整算法
+func dynamicTimeWarping(a, b []float64) float64 {
+	n := len(a)
+	m := len(b)
+
+	// 创建DTW矩阵
+	dtw := make([][]float64, n+1)
+	for i := range dtw {
+		dtw[i] = make([]float64, m+1)
+		for j := range dtw[i] {
+			dtw[i][j] = math.Inf(1)
+		}
+	}
+	dtw[0][0] = 0
+
+	// 计算DTW距离
+	for i := 1; i <= n; i++ {
+		for j := 1; j <= m; j++ {
+			cost := math.Abs(a[i-1] - b[j-1])
+			dtw[i][j] = cost + minFloat(
+				dtw[i-1][j],   // 插入
+				dtw[i][j-1],   // 删除
+				dtw[i-1][j-1], // 匹配
+			)
+		}
+	}
+
+	// 返回规范化的DTW距离
+	return 1.0 / (1.0 + dtw[n][m]/(float64(n+m)))
+}
+
+// min 计算三个浮点数中的最小值
+func minFloat(a, b, c float64) float64 {
+	if a <= b && a <= c {
+		return a
+	} else if b <= a && b <= c {
+		return b
+	}
+	return c
+}
+
+// boolToFloat 将布尔值转换为浮点数
+func boolToFloat(b bool) float64 {
+	if b {
+		return 1.0
+	}
+	return 0.0
 }
