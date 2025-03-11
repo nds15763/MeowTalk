@@ -36,6 +36,20 @@ export default function HomePage() {
             </TouchableOpacity>
             
             <TouchableOpacity
+              style={[styles.button, styles.aiTalkButton]}
+              onPress={() => navigation.navigate('VideoAITrans' as never)}
+            >
+              <Text style={styles.buttonText}>AI语音助手</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.button, styles.aiTalkNativeButton]}
+              onPress={() => navigation.navigate('VideoAITransNative' as never)}
+            >
+              <Text style={styles.buttonText}>AI视频助手（优化版）</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
               style={[styles.button, styles.testButton]}
               onPress={() => navigation.navigate('TestAudio' as never)}
             >
@@ -99,10 +113,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Platform.OS === 'android' ? 35 : 40,
     paddingVertical: Platform.OS === 'android' ? 12 : 15,
     borderRadius: 25,
+    marginVertical: 5,
   },
   testButton: {
-    marginTop: 10,
     backgroundColor: '#7B6CF6',  // 使用不同的颜色区分测试按钮
+  },
+  aiTalkButton: {
+    backgroundColor: '#FF9A8B',  // 使用暖色调为AI语音助手按钮
+  },
+  aiTalkNativeButton: {
+    backgroundColor: '#34C759',  // 使用绿色调为AI视频助手（优化版）按钮
   },
   buttonText: {
     color: '#fff',

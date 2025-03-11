@@ -70,7 +70,7 @@ func NewMockAudioProcessor() *MockAudioProcessor {
 		windowSize:         44100,  // 滑动窗口大小1秒(44100样本)
 		stepSize:           22050,  // 滑动窗口步进0.5秒(22050样本)（50%重叠）
 		maxBufferSize:      132300, // 最大缓冲区大小3秒(3*44100样本)
-		frontendSampleRate: 4410,   // 前端采样率
+		frontendSampleRate: 441,    // 前端采样率 - 考虑到前端对原始44100Hz的数据进行了100倍降采样
 	}
 }
 
@@ -125,11 +125,14 @@ func (m *MockAudioProcessor) ProcessAudio(streamID string, data []float64) ([]by
 	}
 
 	// 计算实际持续时间
-	// 注意：前端可能发送的是频域数据，而不是时域数据
-	// 计算实际持续时间时需要考虑前端降采样因素和采样率差异
-	// 前端采样率通常比后端低，这里取值4410Hz (假设前端使用44100Hz的1/10)
+	// 前端使用MediaRecorder捕获数据时进行了100倍降采样 (index % 100 === 0)
+	// 因此实际采样率应该是约441Hz (44100/100)
+	// 时间 = 样本数 / 采样率
+	secondsSinceLastProcess := time.Since(m.lastProcessTime).Seconds()
 	bufferDuration := float64(len(m.audioBuffer)) / float64(m.frontendSampleRate)
-	log.Printf("音频缓冲区：当前长度=%d 样本, 持续时间=%.2f秒", len(m.audioBuffer), bufferDuration)
+
+	log.Printf("音频缓冲区：当前长度=%d 样本, 持续时间=%.2f秒, 距离上次处理=%.2f秒",
+		len(m.audioBuffer), bufferDuration, secondsSinceLastProcess)
 
 	// 确定是否需要处理音频
 	shouldProcess := false
@@ -342,7 +345,7 @@ func extractAudioFeatures(data []float64, sampleRate int, windowIndex int, start
 	features.StartTime = startTime
 	features.EndTime = endTime
 
-	// 计算持续时间（秒），考虑降采样因子
+	// 计算持续时间（秒），考虑降采样因素
 	features.Duration = float64(len(data)) / float64(sampleRate)
 	log.Printf("持续时间计算: 数据点数=%d, 有效采样率=%d, 计算结果=%.3f秒",
 		len(data), sampleRate, features.Duration)
@@ -1248,7 +1251,7 @@ func (m *MockAudioProcessor) handleSend(w http.ResponseWriter, r *http.Request) 
 	} else {
 		// 还没有结果，返回状态信息
 		m.bufferMutex.Lock()
-		bufferDuration := float64(len(m.audioBuffer)) / float64(m.sampleRate)
+		bufferDuration := float64(len(m.audioBuffer)) / float64(m.frontendSampleRate)
 		m.bufferMutex.Unlock()
 
 		// 返回当前缓冲状态
@@ -1657,18 +1660,21 @@ func (m *MockAudioProcessor) processAudioSegment(streamID string, data []float64
 	// 从样本库匹配情感
 	emotion, confidence := recognizeEmotionWithSamples(finalFeatures)
 
+	log.Printf("[样本库匹配结果] streamID: %s, 是否猫叫： %t, 情感: %s, 置信度: %.2f", streamID, isCatMeow, emotion, confidence)
 	// 如果波形匹配成功且置信度足够高，使用波形匹配结果
-	if isCatMeow && waveformMatchConfidence > 0.75 {
+	if isCatMeow && waveformMatchConfidence >= 0.75 {
+		// 打印所有的音频特征数据
+		log.Printf("[音频特征数据] Energy=%.4f, Pitch=%.4f, Duration=%.4f, ZeroCrossRate=%.4f, "+
+			"RootMeanSquare=%.4f, PeakFreq=%.4f, SpectralCentroid=%.4f, SpectralRolloff=%.4f, FundamentalFreq=%.4f",
+			finalFeatures.Energy, finalFeatures.Pitch, finalFeatures.Duration, finalFeatures.ZeroCrossRate,
+			finalFeatures.RootMeanSquare, finalFeatures.PeakFreq, finalFeatures.SpectralCentroid,
+			finalFeatures.SpectralRolloff, finalFeatures.FundamentalFreq)
+
 		log.Printf("[%s] 采用波形匹配结果: %s (置信度: %.2f, 猫叫置信度: %.2f)",
 			streamID, waveformMatchEmotion, waveformMatchConfidence, 1.0)
 		emotion = waveformMatchEmotion
 		confidence = waveformMatchConfidence
 	}
-
-	log.Printf("[%s] 波形匹配结果: %s (置信度: %.2f)",
-		streamID, emotion, confidence)
-
-	log.Printf("[%s] 猫叫置信度: %.2f", streamID, confidence)
 
 	// 如果匹配置信度低，尝试使用AI分析
 	if confidence < 0.65 {
