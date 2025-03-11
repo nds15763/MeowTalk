@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions, ActivityIndicator, ScrollView } from 'react-native';
-import * as ExpoCamera from 'expo-camera';
+import { CameraView, useCameraPermissions, PermissionResponse } from 'expo-camera';
 import { Audio } from 'expo-av';
 import { create } from 'zustand';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AliBaiLianSDK, BaiLianResponse } from '../sdk';
+import * as FileSystem from 'expo-file-system';
 import MeowDetector, { MeowDetectorRef, MeowDetectorState } from '../sdk/meowDetector';
 import { AudioFeatures } from '../sdk/audioTypes';
+import { MoonShotService } from '../sdk/MoonShot';
 
 // 定义视频状态枚举
 export enum VideoState {
@@ -38,6 +39,28 @@ type VideoContext = {
   timestamp: number;
   frameDataUrl?: string;
 };
+
+// 定义大模型接口类型
+export interface MeowAIModelResponse {
+  text: string;
+}
+
+// 抽象的大模型调用服务
+class MeowAIService {
+  async analyzeImageWithContext(imageBase64: string, audioFeatures: AudioFeatures): Promise<MeowAIModelResponse> {
+    // 这里是大模型调用的抽象实现，未来会被真实实现替换
+    console.log('调用大模型分析图像和音频特征，图像大小:', imageBase64.length, '音频特征:', JSON.stringify(audioFeatures));
+    
+    // 模拟大模型分析结果
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        resolve({
+          text: `分析结果: 这只猫咪可能在表达${Math.random() < 0.5 ? '饥饿' : '想要关注'}。它的音频特征显示声音频率为${audioFeatures.FundamentalFreq.toFixed(1)}Hz，持续时间为${audioFeatures.Duration.toFixed(2)}秒。`
+        });
+      }, 1000);
+    });
+  }
+}
 
 // 创建视频状态存储
 interface VideoStore {
@@ -133,48 +156,27 @@ const PermissionRequest: React.FC<{ onRequestPermission: () => void }> = ({ onRe
 };
 
 // 视频组件
-const VideoView: React.FC = () => {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+const VideoView: React.FC<{cameraRef: React.RefObject<CameraView>, hasPermission: boolean}> = ({ cameraRef, hasPermission }) => {
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(true);
   
-  // 使用相机权限请求方式
-  const requestCameraPermission = async () => {
-    try {
-      const { status } = await ExpoCamera.Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    } catch (error) {
-      console.error('请求相机权限失败:', error);
-      setHasPermission(false);
-    }
-  };
-
-  useEffect(() => {
-    (async () => {
-      await requestCameraPermission();
-    })();
+  // 监听摄像头状态
+  const handleCameraReady = useCallback(() => {
+    console.log('摄像头已就绪');
+    setCameraReady(true);
+    setCameraLoading(false);
   }, []);
 
-  // 模拟相机准备完成
+  // 监听权限变化
   useEffect(() => {
     if (hasPermission) {
-      const timer = setTimeout(() => {
-        setCameraReady(true);
-        setCameraLoading(false);
-      }, 1000);
-      return () => clearTimeout(timer);
+      console.log('VideoView: 已获得摄像头权限');
+    } else {
+      console.log('VideoView: 未获得摄像头权限');
     }
   }, [hasPermission]);
 
-  if (hasPermission === null) {
-    return (
-      <View style={styles.videoContainer}>
-        <Text style={styles.loadingText}>请求摄像头权限...</Text>
-      </View>
-    );
-  }
-
-  if (hasPermission === false) {
+  if (!hasPermission) {
     return (
       <View style={styles.videoContainer}>
         <Text style={styles.loadingText}>没有摄像头权限</Text>
@@ -186,18 +188,22 @@ const VideoView: React.FC = () => {
     <View style={styles.videoContainer}>
       {cameraLoading && (
         <View style={styles.cameraLoading}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingText}>启动摄像头...</Text>
+          <ActivityIndicator size="large" color="#333" />
+          <Text style={styles.loadingText}>相机启动中...</Text>
         </View>
       )}
-      <View style={styles.cameraCircle}>
-        <View style={[styles.camera, {justifyContent: 'center', alignItems: 'center'}]}>
-          {cameraReady ? (
-            <Text style={{color: 'white', fontSize: 16}}>摄像头已就绪</Text>
-          ) : (
-            <Text style={{color: 'white', fontSize: 16}}>等待摄像头...</Text>
-          )}
-        </View>
+      <View style={styles.cameraContainer}>
+        <CameraView
+          ref={cameraRef}
+          style={{ width: '100%', height: '100%' }}
+          facing="back"
+          onCameraReady={() => {
+            console.log('相机已就绪');
+            setCameraReady(true);
+            setCameraLoading(false);
+            handleCameraReady();
+          }}
+        />
       </View>
     </View>
   );
@@ -222,141 +228,140 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
   const addAnalysisResult = useVideoStore((state: VideoStore) => state.addAnalysisResult);
   const reset = useVideoStore((state: VideoStore) => state.reset);
   
+  // 相机权限钩子 - 在组件顶层使用
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  
   // 用于存储猫叫检测的音频特征
   const [meowFeatures, setMeowFeatures] = useState<AudioFeatures | null>(null);
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   
   // 保留原有的变量引用
-  const cameraRef = useRef<any>(null);
+  const cameraRef = useRef<CameraView | null>(null);
   const frameTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const baiLianSDKRef = useRef<AliBaiLianSDK | null>(null);
   const meowDetectorRef = useRef<MeowDetectorRef | null>(null);
+  const meowAIServiceRef = useRef<MoonShotService | null>(null);
   
-  // 初始化百炼SDK
+  // 初始化AI服务
   useEffect(() => {
-    baiLianSDKRef.current = new AliBaiLianSDK({
-      appId: '你的百炼AppID',
-      apiKey: '你的百炼ApiKey',
-    });
+    meowAIServiceRef.current = new MoonShotService();
   }, []);
   
   // 处理猫叫检测结果的回调函数
-  const handleMeowDetected = useCallback((isMeow: boolean, features?: AudioFeatures) => {
+  const handleMeowDetected = useCallback(async (isMeow: boolean, features?: AudioFeatures) => {
     if (isMeow && features) {
       console.log('检测到猫叫声，特征数据:', features);
       setMeowFeatures(features);
       
-      // 将特征数据转换为字符串，以便在提示词中使用
-      const featuresStr = JSON.stringify(features, null, 2);
+      // 在检测到猫叫时立即捕获一张图片
+      await captureImage(features);
+    }
+  }, []);
+
+  // 捕获图像并与音频特征一起发送到AI分析
+  const captureImage = async (audioFeatures: AudioFeatures) => {
+    if (!cameraRef.current) {
+      console.error('相机未就绪');
+      return;
+    }
+    
+    try {
+      useVideoStore.getState().setIsProcessingFrame(true);
       
-      // 构建提示词并调用百炼SDK
-      const promptText = `检测到猫叫声，音频特征分析结果如下：${featuresStr}\n请分析这只猫咪可能在表达什么？`;
+      // 捕获图像
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.5, // 降低质量以减小文件大小
+        base64: true, // 获取base64编码
+        exif: false, // 不需要exif数据
+        skipProcessing: true // 跳过额外处理以加快速度
+      });
       
-      // 设置为分析状态
-      setAIState(AIAnalysisState.Analyzing);
-      setIsWaitingResponse(true);
-      
-      // 调用百炼SDK
-      if (baiLianSDKRef.current) {
-        baiLianSDKRef.current.sendTextMessage(promptText)
-          .then((response: BaiLianResponse) => {
+      if (photo) {
+        setCapturedImageUri(photo.uri);
+        console.log('照片已捕获，URI:', photo.uri, '大小:', photo.base64?.length || 0);
+        
+        // 如果有base64数据，发送到AI分析
+        if (photo.base64 && meowAIServiceRef.current) {
+          setAIState(AIAnalysisState.Analyzing);
+          setIsWaitingResponse(true);
+          
+          try {
+            // 调用AI服务分析图像和音频特征
+            const response = await meowAIServiceRef.current.analyzeImageWithAudio(
+              photo.base64,
+              audioFeatures
+            );
+            
             // 处理返回结果
-            if (response && response.output && response.output.text) {
+            if (response && response.text) {
               // 添加分析结果
               addAnalysisResult({
-                message: response.output.text,
-                timestamp: Date.now()
+                message: response.text,
+                timestamp: Date.now(),
+                frameDataUrl: `data:image/jpeg;base64,${photo.base64}`
               });
             }
+            
             setIsWaitingResponse(false);
             setAIState(AIAnalysisState.Done);
-          })
-          .catch((error) => {
-            console.error('百炼API调用失败:', error);
+          } catch (error: any) {
+            console.error('AI分析调用失败:', error);
             setIsWaitingResponse(false);
             setAIState(AIAnalysisState.Idle);
-          });
+          }
+        }
       }
+    } catch (error: any) {
+      console.error('捕获图像失败:', error);
+    } finally {
+      useVideoStore.getState().setIsProcessingFrame(false);
     }
-  }, [addAnalysisResult, setAIState, setIsWaitingResponse]);
+  };
 
-  // 请求相机和麦克风权限
+  // 请求所有需要的权限
   const requestPermissions = async () => {
     try {
       // 请求相机权限
-      let cameraStatus = 'denied';
-      try {
-        const result = await ExpoCamera.Camera.requestCameraPermissionsAsync();
-        cameraStatus = result.status;
-      } catch (error) {
-        console.error('请求相机权限失败:', error);
-      }
+      await requestCameraPermission();
+      // 需要等待相机权限状态更新
+      await new Promise<void>(resolve => setTimeout(resolve, 500));
+      
+      // 检查相机权限状态
+      const cameraStatus = cameraPermission?.granted ? 'granted' : 'denied';
+      console.log('相机权限状态:', cameraStatus);
       
       // 请求麦克风权限
       const { status: audioStatus } = await Audio.requestPermissionsAsync();
+      console.log('麦克风权限状态:', audioStatus);
       
+      // 如果相机和麦克风权限已获得，则可以继续
       if (cameraStatus === 'granted' && audioStatus === 'granted') {
         setHasPermissions(true);
         return true;
       } else {
-        console.error('未获取到相机或麦克风权限');
-        useVideoStore.getState().setVideoState(VideoState.Error, '需要摄像头和麦克风权限才能继续');
+        console.error('未获取到必要权限，相机:', cameraStatus, '麦克风:', audioStatus);
+        useVideoStore.getState().setVideoState(VideoState.Error, '需要相机和麦克风权限才能继续');
         return false;
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('请求权限失败:', error);
       useVideoStore.getState().setVideoState(VideoState.Error, '权限请求失败');
       return false;
     }
   };
-
-  // 开始视频分析
-  const startVideoAnalysis = useCallback(() => {
-    // 清除旧的定时器
-    if (frameTimerRef.current) {
-      clearInterval(frameTimerRef.current);
-    }
-    
-    // 设置新的定时器，每3秒捕获一帧
-    frameTimerRef.current = setInterval(() => {
-      if (!isProcessingFrame && !isWaitingResponse) {
-        // 设置正在处理帧
-        useVideoStore.getState().setIsProcessingFrame(true);
-        // 捕获视频帧
-        captureFrame();
-      }
-    }, 3000); // 3秒捕获一次
-  }, [isProcessingFrame, isWaitingResponse]);
   
-  // 停止视频分析
-  const stopVideoAnalysis = useCallback(() => {
-    if (frameTimerRef.current) {
-      clearInterval(frameTimerRef.current);
-      frameTimerRef.current = null;
-    }
-  }, []);
-  
-  // 当组件挂载或通话连接状态改变时，启动视频分析
-  useEffect(() => {
-    if (videoState === VideoState.Capturing && hasPermissions) {
-      startVideoAnalysis();
-    } else {
-      stopVideoAnalysis();
-    }
-    
-    return () => {
-      stopVideoAnalysis();
-    };
-  }, [videoState, hasPermissions, startVideoAnalysis, stopVideoAnalysis]);
-  
-  // 开始通话
+  // 开始通话/录制
   const handleStartCall = async () => {
     // 检查权限
     if (!hasPermissions) {
-      useVideoStore.getState().setVideoState(VideoState.PermissionRequired);
-      return;
+      // 请求权限
+      const hasAllPermissions = await requestPermissions();
+      if (!hasAllPermissions) {
+        useVideoStore.getState().setVideoState(VideoState.PermissionRequired);
+        return;
+      }
     }
     
-    // 更新状态为连接中
+    // 更新状态为录制中
     useVideoStore.getState().setVideoState(VideoState.Capturing);
     
     // 启动猫叫检测器
@@ -365,96 +370,19 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
     }
   };
   
-  // 结束通话
+  // 结束通话/录制
   const handleEndCall = async () => {
+    // 停止猫叫检测器
+    if (meowDetectorRef.current) {
+      meowDetectorRef.current.stopListening();
+    }
+    
     // 重置状态
     useVideoStore.getState().reset();
     
     // 退出
     if (onExit) {
       onExit();
-    }
-  };
-  
-  // 视频帧捕获
-  const captureFrame = async () => {
-    if (!cameraRef.current) return;
-    
-    try {
-      const frame = await cameraRef.current.takePictureAsync();
-      
-      if (frame) {
-        const base64Image = await convertImageToBase64(frame);
-        
-        if (base64Image) {
-          // 发送视频帧到AI分析
-          sendFrameToAI(base64Image);
-        }
-      }
-    } catch (error) {
-      console.error('视频帧捕获错误:', error);
-    }
-  };
-  
-  // 转换图片为base64
-  const convertImageToBase64 = async (image: any) => {
-    try {
-      const base64Image = await image.base64;
-      
-      return base64Image;
-    } catch (error) {
-      console.error('图片转换错误:', error);
-      return null;
-    }
-  };
-  
-  // 发送视频帧到AI分析
-  const sendFrameToAI = async (base64Image: string) => {
-    if (!baiLianSDKRef.current) return;
-    
-    try {
-      // 构建提示词，描述当前画面
-      const prompt = `这是一个来自摄像头的视频帧图像。请分析这个图像中是否有猫咪，如果有，请描述猫咪的外貌、姿态和可能的情绪状态。如果没有猫咪，请简单描述图像中的内容。`;
-      
-      // 创建图片URL列表
-      const imageUrls = [`data:image/jpeg;base64,${base64Image}`];
-      
-      // 使用百度链SDK发送图片消息
-      const response = await baiLianSDKRef.current.sendImageMessage(prompt, imageUrls);
-      
-      if (response) {
-        // 处理AI分析响应
-        handleAIResponse(response);
-      }
-    } catch (error) {
-      console.error('发送视频帧错误:', error);
-    } finally {
-      useVideoStore.getState().setIsProcessingFrame(false);
-    }
-  };
-  
-  // 处理AI分析响应
-  const handleAIResponse = (response: BaiLianResponse) => {
-    try {
-      // 获取响应文本
-      const responseText = response.output?.text || '无法获取分析结果';
-      
-      // 更新视频上下文
-      const videoContext: VideoContext = {
-        message: responseText,
-        timestamp: Date.now(),
-        // 我们没有frameDataUrl，因为响应中不包含这个
-      };
-      
-      useVideoStore.getState().addAnalysisResult(videoContext);
-      
-      // 更新当前分析结果
-      useVideoStore.getState().setCurrentAnalysis(responseText);
-      
-      // 更新是否正在等待响应
-      useVideoStore.getState().setIsWaitingResponse(false);
-    } catch (error) {
-      console.error('处理AI分析响应错误:', error);
     }
   };
   
@@ -470,7 +398,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
       return (
         <View style={styles.contentContainer}>
           <View style={styles.cameraSection}>
-            <VideoView />
+            <VideoView cameraRef={cameraRef} hasPermission={hasPermissions} />
             
             {/* AI分析状态区域 */}
             <View style={styles.aiStatusSection}>
@@ -500,6 +428,13 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
                         {new Date(item.timestamp).toLocaleTimeString()}
                       </Text>
                     </View>
+                    {item.frameDataUrl && (
+                      <Image 
+                        source={{uri: item.frameDataUrl}} 
+                        style={styles.analysisImage} 
+                        resizeMode="cover"
+                      />
+                    )}
                     <Text style={styles.analysisText}>{item.message}</Text>
                   </View>
                 ))
@@ -528,8 +463,13 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
       </View>
       
       <View style={styles.controlsContainer}>
-        <TouchableOpacity style={styles.callButton} onPress={handleStartCall}>
-          <Text style={{fontSize: 20, color: '#FFF'}}>开始通话</Text>
+        <TouchableOpacity 
+          style={[styles.callButton, videoState === VideoState.Capturing ? styles.endCallButton : {}]} 
+          onPress={videoState === VideoState.Capturing ? handleEndCall : handleStartCall}
+        >
+          <Text style={{fontSize: 20, color: '#FFF'}}>
+            {videoState === VideoState.Capturing ? '结束录制' : '开始录制'}
+          </Text>
         </TouchableOpacity>
         
         {/* 隐藏猫叫检测器UI，只保留功能 */}
@@ -537,10 +477,6 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
           ref={meowDetectorRef}
           showUI={false}
           onMeowDetected={handleMeowDetected}
-          baiLianConfig={{
-            appId: '你的百炼AppID',
-            apiKey: '你的百炼ApiKey'
-          }}
         />
       </View>
     </SafeAreaView>
@@ -608,7 +544,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cameraCircle: {
+  cameraContainer: {
     width: '100%',
     height: '100%',
     borderRadius: windowWidth * 0.25, 
@@ -688,6 +624,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B95',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  endCallButton: {
+    backgroundColor: '#FF3737',
   },
   aiResponseOverlay: {
     position: 'absolute',
@@ -795,6 +734,12 @@ const styles = StyleSheet.create({
   analysisText: {
     fontSize: 16,
     color: '#333',
+  },
+  analysisImage: {
+    width: '100%',
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   noResultText: {
     fontSize: 16,
