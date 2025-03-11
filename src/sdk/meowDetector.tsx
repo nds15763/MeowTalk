@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Audio } from 'expo-av';
 import { AliBaiLianSDK } from './aliBaiLianSDK';
@@ -15,6 +15,14 @@ export enum MeowDetectorState {
   Detected = 'detected'
 }
 
+// 导出猫叫检测器引用类型
+export interface MeowDetectorRef {
+  startListening: () => Promise<void>;
+  stopListening: () => void;
+  isListening: boolean;
+  detectorState: MeowDetectorState;
+}
+
 interface MeowDetectorProps {
   // 检测到猫叫时的回调，返回是否是猫叫和音频特征
   onMeowDetected?: (isMeow: boolean, features?: AudioFeatures) => void;
@@ -22,15 +30,18 @@ interface MeowDetectorProps {
     appId: string;
     apiKey: string;
   };
+  // 是否显示UI组件
+  showUI?: boolean;
 }
 
 /**
  * 猫叫检测组件
  */
-const MeowDetector: React.FC<MeowDetectorProps> = ({ 
+const MeowDetector = forwardRef<MeowDetectorRef, MeowDetectorProps>(({ 
   onMeowDetected,
-  baiLianConfig
-}) => {
+  baiLianConfig,
+  showUI = false
+}, ref) => {
   // 状态
   const [detectorState, setDetectorState] = useState<MeowDetectorState>(MeowDetectorState.Idle);
   const [isListening, setIsListening] = useState(false);
@@ -40,6 +51,14 @@ const MeowDetector: React.FC<MeowDetectorProps> = ({
   const processorRef = useRef<AudioProcessor | null>(null);
   const baiLianSDKRef = useRef<AliBaiLianSDK | null>(null);
   const audioProcessingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 向父组件暴露方法
+  useImperativeHandle(ref, () => ({
+    startListening,
+    stopListening,
+    isListening,
+    detectorState
+  }), [isListening, detectorState]);
   
   // 初始化百炼SDK和音频处理器
   useEffect(() => {
@@ -240,25 +259,27 @@ const MeowDetector: React.FC<MeowDetectorProps> = ({
   };
   
   return (
-    <View style={styles.container}>
-      <TouchableOpacity 
-        style={[styles.button, isListening ? styles.stopButton : styles.startButton]} 
-        onPress={toggleListening}
-      >
-        <Text style={styles.buttonText}>
-          {isListening ? '停止监听' : '开始监听'}
+    showUI ? (
+      <View style={styles.container}>
+        <TouchableOpacity 
+          style={[styles.button, isListening ? styles.stopButton : styles.startButton]} 
+          onPress={toggleListening}
+        >
+          <Text style={styles.buttonText}>
+            {isListening ? '停止监听' : '开始监听'}
+          </Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.statusText}>
+          {detectorState === MeowDetectorState.Idle && '未启动'}
+          {detectorState === MeowDetectorState.Recording && '正在监听...'}
+          {detectorState === MeowDetectorState.Processing && '处理中...'}
+          {detectorState === MeowDetectorState.Detected && '检测到猫叫！'}
         </Text>
-      </TouchableOpacity>
-      
-      <Text style={styles.statusText}>
-        {detectorState === MeowDetectorState.Idle && '未启动'}
-        {detectorState === MeowDetectorState.Recording && '正在监听...'}
-        {detectorState === MeowDetectorState.Processing && '处理中...'}
-        {detectorState === MeowDetectorState.Detected && '检测到猫叫！'}
-      </Text>
-    </View>
+      </View>
+    ) : null
   );
-};
+});
 
 // 样式
 const styles = StyleSheet.create({

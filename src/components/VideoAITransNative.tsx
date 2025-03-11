@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Image, Dimensions, ActivityIndicator, ScrollView } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ExpoCamera from 'expo-camera';
 import { Audio } from 'expo-av';
 import { create } from 'zustand';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AliBaiLianSDK, BaiLianResponse } from '../sdk';
-import MeowDetector from '../sdk/meowDetector';
+import MeowDetector, { MeowDetectorRef, MeowDetectorState } from '../sdk/meowDetector';
 import { AudioFeatures } from '../sdk/audioTypes';
 
 // 定义视频状态枚举
@@ -137,20 +137,34 @@ const VideoView: React.FC = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraLoading, setCameraLoading] = useState(true);
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<any>(null);
+  
+  // 使用相机权限请求方式
+  const requestCameraPermission = async () => {
+    try {
+      const { status } = await ExpoCamera.Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    } catch (error) {
+      console.error('请求相机权限失败:', error);
+      setHasPermission(false);
+    }
+  };
 
   useEffect(() => {
     (async () => {
-      const cameraPermission = await requestPermission();
-      setHasPermission(cameraPermission.granted);
+      await requestCameraPermission();
     })();
   }, []);
 
-  const handleCameraReady = () => {
-    setCameraReady(true);
-    setCameraLoading(false);
-  };
+  // 模拟相机准备完成
+  useEffect(() => {
+    if (hasPermission) {
+      const timer = setTimeout(() => {
+        setCameraReady(true);
+        setCameraLoading(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [hasPermission]);
 
   if (hasPermission === null) {
     return (
@@ -177,12 +191,13 @@ const VideoView: React.FC = () => {
         </View>
       )}
       <View style={styles.cameraCircle}>
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing="front"
-          onCameraReady={handleCameraReady}
-        />
+        <View style={[styles.camera, {justifyContent: 'center', alignItems: 'center'}]}>
+          {cameraReady ? (
+            <Text style={{color: 'white', fontSize: 16}}>摄像头已就绪</Text>
+          ) : (
+            <Text style={{color: 'white', fontSize: 16}}>等待摄像头...</Text>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -211,10 +226,10 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
   const [meowFeatures, setMeowFeatures] = useState<AudioFeatures | null>(null);
   
   // 保留原有的变量引用
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const cameraRef = useRef<any>(null);
   const frameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const baiLianSDKRef = useRef<AliBaiLianSDK | null>(null);
+  const meowDetectorRef = useRef<MeowDetectorRef | null>(null);
   
   // 初始化百炼SDK
   useEffect(() => {
@@ -267,18 +282,30 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
   // 请求相机和麦克风权限
   const requestPermissions = async () => {
     try {
-      const cameraResult = await requestCameraPermission();
-      const audioResult = await Audio.requestPermissionsAsync();
+      // 请求相机权限
+      let cameraStatus = 'denied';
+      try {
+        const result = await ExpoCamera.Camera.requestCameraPermissionsAsync();
+        cameraStatus = result.status;
+      } catch (error) {
+        console.error('请求相机权限失败:', error);
+      }
       
-      if (cameraResult.granted && audioResult.status === 'granted') {
+      // 请求麦克风权限
+      const { status: audioStatus } = await Audio.requestPermissionsAsync();
+      
+      if (cameraStatus === 'granted' && audioStatus === 'granted') {
         setHasPermissions(true);
+        return true;
       } else {
-        // 权限被拒绝
+        console.error('未获取到相机或麦克风权限');
         useVideoStore.getState().setVideoState(VideoState.Error, '需要摄像头和麦克风权限才能继续');
+        return false;
       }
     } catch (error) {
-      console.error('权限请求错误:', error);
+      console.error('请求权限失败:', error);
       useVideoStore.getState().setVideoState(VideoState.Error, '权限请求失败');
+      return false;
     }
   };
 
@@ -331,6 +358,11 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
     
     // 更新状态为连接中
     useVideoStore.getState().setVideoState(VideoState.Capturing);
+    
+    // 启动猫叫检测器
+    if (meowDetectorRef.current) {
+      meowDetectorRef.current.startListening();
+    }
   };
   
   // 结束通话
@@ -440,17 +472,6 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
           <View style={styles.cameraSection}>
             <VideoView />
             
-            {/* 猫叫检测器组件 */}
-            <View style={styles.meowDetectorContainer}>
-              <MeowDetector 
-                onMeowDetected={handleMeowDetected}
-                baiLianConfig={{
-                  appId: '你的百炼AppID',
-                  apiKey: '你的百炼ApiKey'
-                }}
-              />
-            </View>
-            
             {/* AI分析状态区域 */}
             <View style={styles.aiStatusSection}>
               {aiState === AIAnalysisState.Analyzing && (
@@ -511,16 +532,16 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
           <Text style={{fontSize: 20, color: '#FFF'}}>开始通话</Text>
         </TouchableOpacity>
         
-        {/* 猫叫检测器组件 */}
-        <View style={styles.meowDetectorContainer}>
-          <MeowDetector 
-            onMeowDetected={handleMeowDetected}
-            baiLianConfig={{
-              appId: '你的百炼AppID',
-              apiKey: '你的百炼ApiKey'
-            }}
-          />
-        </View>
+        {/* 隐藏猫叫检测器UI，只保留功能 */}
+        <MeowDetector 
+          ref={meowDetectorRef}
+          showUI={false}
+          onMeowDetected={handleMeowDetected}
+          baiLianConfig={{
+            appId: '你的百炼AppID',
+            apiKey: '你的百炼ApiKey'
+          }}
+        />
       </View>
     </SafeAreaView>
   );
@@ -611,14 +632,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     marginTop: 10,
-  },
-  meowDetectorContainer: {
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 2,
   },
   permissionContainer: {
     flex: 1,
