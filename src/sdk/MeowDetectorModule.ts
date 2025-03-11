@@ -102,27 +102,29 @@ export class MeowDetectorModule {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DUCK_OTHERS,
+        interruptionModeIOS: 1, // 1 对应 DUCK_OTHERS 模式
         shouldDuckAndroid: true,
-        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
+        interruptionModeAndroid: 1, // 1 对应 DUCK_OTHERS 模式
         playThroughEarpieceAndroid: false,
       });
       
       // u51c6u5907u5f55u97f3
       this.recording = new Audio.Recording();
-      await this.recording.prepareToRecordAsync({
+      
+      // u4f7fu7528 expo-av u9884u8bbeu7684u5f55u97f3u9009u9879
+      const recordingOptions = {
         android: {
           extension: '.m4a',
-          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_AAC_ADTS,
-          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+          outputFormat: Audio.AndroidOutputFormat.AAC_ADTS,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
           sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
         },
         ios: {
           extension: '.m4a',
-          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
-          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_MEDIUM,
+          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+          audioQuality: Audio.IOSAudioQuality.MEDIUM,
           sampleRate: 44100,
           numberOfChannels: 1,
           bitRate: 128000,
@@ -130,7 +132,13 @@ export class MeowDetectorModule {
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
         },
-      });
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      };
+      
+      await this.recording.prepareToRecordAsync(recordingOptions);
       
       // u7ed1u5b9au66f4u65b0u4e8bu4ef6
       this.recording.setOnRecordingStatusUpdate(this.onRecordingStatusUpdate);

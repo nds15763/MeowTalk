@@ -247,9 +247,10 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
   }, []);
   
   // 处理猫叫检测结果的回调函数
-  const handleMeowDetected = useCallback(async (isMeow: boolean, features?: AudioFeatures) => {
+  const handleMeowDetected = useCallback(async (isMeow: boolean, features?: AudioFeatures, confidence?: number) => {
+    console.log('未检测到猫叫声');
     if (isMeow && features) {
-      console.log('检测到猫叫声，特征数据:', features);
+      console.log('检测到猫叫声，特征数据:', features, '可信度:', confidence);
       setMeowFeatures(features);
       
       // 在检测到猫叫时立即捕获一张图片
