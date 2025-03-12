@@ -57,6 +57,28 @@ export class AudioProcessor {
   }
 
   /**
+   * u83b7u53d6u5f53u524du97f3u9891u7f13u51b2u533au6570u636e
+   */
+  public getAudioBuffer(): Float32Array {
+    return this.audioBuffer;
+  }
+
+  /**
+   * u6e05u9664u97f3u9891u7f13u51b2u533a
+   */
+  public clearBuffer(): void {
+    this.audioBuffer = new Float32Array();
+  }
+
+  /**
+   * u91cdu7f6eu97f3u9891u5904u7406u5668
+   */
+  public reset(): void {
+    this.audioBuffer = new Float32Array();
+    this.lastProcessTime = Date.now();
+  }
+
+  /**
    * u5224u65adu662fu5426u9700u8981u5904u7406u97f3u9891
    */
   public shouldProcessAudio(): boolean {
@@ -505,13 +527,5 @@ export class AudioProcessor {
   private calculateSingleFeatureSimilarity(value1: number, value2: number, tolerance: number): number {
     const diff = Math.abs(value1 - value2);
     return Math.max(0, 1 - diff / tolerance);
-  }
-
-  /**
-   * u6e05u7a7au97f3u9891u7f13u51b2u533a
-   */
-  public reset(): void {
-    this.audioBuffer = new Float32Array();
-    this.lastProcessTime = Date.now();
   }
 }

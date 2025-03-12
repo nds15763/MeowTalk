@@ -1,5 +1,7 @@
 package main
 
+// #include <stdlib.h>
+import "C"
 import (
 	"encoding/json"
 	"fmt"
@@ -12,10 +14,39 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/gorilla/websocket"
 	"golang.org/x/exp/rand"
 )
+
+//export ProcessAudioData
+func ProcessAudioData(data *C.float, length C.int) *C.char {
+	// 将C数组转换为Go切片
+	goData := make([]float64, int(length))
+	for i := 0; i < int(length); i++ {
+		goData[i] = float64(*((*C.float)(unsafe.Pointer(uintptr(unsafe.Pointer(data)) + uintptr(i)*unsafe.Sizeof(*data)))))
+	}
+	
+	// 使用现有的音频处理器处理数据
+	processor := NewMockAudioProcessor()
+	result, err := processor.ProcessAudio("mobile-stream", goData)
+	if err != nil {
+		errorResult, _ := json.Marshal(map[string]string{
+			"status": "error",
+			"message": err.Error(),
+		})
+		return C.CString(string(errorResult))
+	}
+	
+	// 返回JSON结果
+	return C.CString(string(result))
+}
+
+//export FreeCString
+func FreeCString(str *C.char) {
+	C.free(unsafe.Pointer(str))
+}
 
 // AudioProcessor 音频处理接口
 type AudioProcessor interface {

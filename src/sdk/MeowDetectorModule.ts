@@ -1,14 +1,18 @@
 /**
- * u732bu53ebu68c0u6d4bu6a21u5757
- * u63d0u4f9bu732bu53ebu68c0u6d4bu529fu80fduff0cu9002u7528u4e8eReact Native
+ * 猫叫检测模块
+ * 提供猫叫检测功能，适用于React Native
  */
 
 import { Audio } from 'expo-av';
 import { AudioFeatures, AudioAnalysisResult } from './audioTypes';
 import { AudioProcessor } from './audioProcessor';
 import { AliBaiLianSDK } from './aliBaiLianSDK';
+import { NativeModules, Platform } from 'react-native';
 
-// u5b9au4e49u732bu53ebu68c0u6d4bu5668u72b6u6001
+// 获取原生模块
+const { MeowDetectorNative } = NativeModules;
+
+// 定义猫叫检测器状态
 export enum MeowDetectorState {
   Idle = 'idle',
   Recording = 'recording',
@@ -16,14 +20,14 @@ export enum MeowDetectorState {
   Detected = 'detected'
 }
 
-// u6a21u5757u914du7f6e
+// 模块配置
 interface MeowDetectorConfig {
-  // u767eu70bcSDKu914du7f6e
+  // 百炼SDK配置
   baiLianConfig?: {
     appId: string;
     apiKey: string;
   };
-  // u97f3u9891u5904u7406u5668u914du7f6e
+  // 音频处理器配置
   audioProcessorConfig?: {
     sampleRate?: number;
     silenceThreshold?: number;
@@ -31,7 +35,7 @@ interface MeowDetectorConfig {
     minProcessTime?: number;
     maxBufferTime?: number;
   };
-  // u56deu8c03u51fdu6570
+  // 回调函数
   onStateChange?: (state: MeowDetectorState) => void;
   onMeowDetected?: (result: AudioAnalysisResult) => void;
   onAnalysisResult?: (text: string) => void;
@@ -39,7 +43,7 @@ interface MeowDetectorConfig {
 }
 
 /**
- * u732bu53ebu68c0u6d4bu5668u6a21u5757
+ * 猫叫检测器模块
  */
 export class MeowDetectorModule {
   private recording: Audio.Recording | null = null;
@@ -50,17 +54,22 @@ export class MeowDetectorModule {
   private state: MeowDetectorState = MeowDetectorState.Idle;
   private config: MeowDetectorConfig;
   private audioBuffer: Float32Array = new Float32Array();
+  private useNativeModule: boolean = false;
   
   /**
-   * u521bu5efau732bu53ebu68c0u6d4bu5668u6a21u5757
+   * 创建猫叫检测器模块
    */
   constructor(config: MeowDetectorConfig = {}) {
     this.config = config;
     
-    // u521du59cbu5316u97f3u9891u5904u7406u5668
+    // 检查是否可以使用原生模块
+    this.useNativeModule = Platform.OS === 'android' && !!MeowDetectorNative;
+    console.log(`使用原生模块: ${this.useNativeModule ? '是' : '否'}`);
+    
+    // 初始化音频处理器
     this.processor = new AudioProcessor(config.audioProcessorConfig);
     
-    // u521du59cbu5316u767eu70bcSDKuff08u5982u679cu914du7f6eu4e86uff09
+    // 初始化百炼SDK（如果配置了）
     if (config.baiLianConfig && config.baiLianConfig.appId && config.baiLianConfig.apiKey) {
       this.baiLianSDK = new AliBaiLianSDK({
         appId: config.baiLianConfig.appId,
@@ -70,14 +79,14 @@ export class MeowDetectorModule {
   }
   
   /**
-   * u83b7u53d6u5f53u524du72b6u6001
+   * 获取当前状态
    */
   public getState(): MeowDetectorState {
     return this.state;
   }
   
   /**
-   * u8bbeu7f6eu72b6u6001u5e76u89e6u53d1u56deu8c03
+   * 设置状态并触发回调
    */
   private setState(newState: MeowDetectorState): void {
     this.state = newState;
@@ -87,7 +96,7 @@ export class MeowDetectorModule {
   }
   
   /**
-   * u5f00u59cbu5f55u97f3u548cu68c0u6d4b
+   * 开始录音和检测
    */
   public async startListening(): Promise<void> {
     if (this.isListening) {
@@ -95,10 +104,10 @@ export class MeowDetectorModule {
     }
     
     try {
-      // u7533u8bf7u97f3u9891u6743u9650
+      // 申请音频权限
       await Audio.requestPermissionsAsync();
       
-      // u8bbeu7f6eu97f3u9891u6a21u5f0f
+      // 设置音频模式
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -108,10 +117,10 @@ export class MeowDetectorModule {
         playThroughEarpieceAndroid: false,
       });
       
-      // u51c6u5907u5f55u97f3
+      // 准备录音
       this.recording = new Audio.Recording();
       
-      // u4f7fu7528 expo-av u9884u8bbeu7684u5f55u97f3u9009u9879
+      // 使用 expo-av 预设的录音选项
       const recordingOptions = {
         android: {
           extension: '.m4a',
@@ -140,23 +149,23 @@ export class MeowDetectorModule {
       
       await this.recording.prepareToRecordAsync(recordingOptions);
       
-      // u7ed1u5b9au66f4u65b0u4e8bu4ef6
+      // 绑定更新事件
       this.recording.setOnRecordingStatusUpdate(this.onRecordingStatusUpdate);
       
-      // u5f00u59cbu5f55u97f3
+      // 开始录音
       await this.recording.startAsync();
       this.isListening = true;
       this.setState(MeowDetectorState.Recording);
       
-      // u8bbeu7f6eu5b9au65f6u5904u7406
+      // 设置定时处理
       this.processingInterval = setInterval(() => {
         this.processAudioBuffer();
       }, 500);
       
-      console.log('u5f00u59cbu76d1u542cu732bu53eb');
+      console.log('开始监听猫叫');
       
     } catch (error) {
-      console.error('u542fu52a8u97f3u9891u6355u6349u5931u8d25:', error);
+      console.error('启动音频捕捉失败:', error);
       if (this.config.onError) {
         this.config.onError(error as Error);
       }
@@ -164,7 +173,7 @@ export class MeowDetectorModule {
   }
   
   /**
-   * u5f55u97f3u72b6u6001u66f4u65b0u56deu8c03
+   * 录音状态更新回调
    */
   private onRecordingStatusUpdate = async (status: Audio.RecordingStatus) => {
     if (!status.isRecording) {
@@ -172,171 +181,187 @@ export class MeowDetectorModule {
     }
     
     try {
-      // u83b7u53d6u6700u65b0u97f3u9891u6570u636e
+      // 获取最新音频数据
       if (this.recording && status.isRecording) {
         const uri = this.recording.getURI();
         if (uri) {
-          // u6ce8u610fuff1au8fd9u91ccu7684u83b7u53d6u97f3u9891u6570u636eu65b9u5f0fu9700u8981u6839u636eu5b9eu9645u60c5u51b5u8c03u6574
-          // Expou7684Audio APIu4e0du76f4u63a5u63d0u4f9bu539fu59cbu97f3u9891u6570u636eu8bbfu95ee
-          // u5b9eu9645u9879u76eeu4e2du53efu80fdu9700u8981u4f7fu7528u539fNativeu6a21u5757u6216u7b2cu4e09u65b9u5e93
+          // 注意：这里的获取音频数据方式需要根据实际情况调整
+          // Expo的Audio API不直接提供原始音频数据访问
+          // 实际项目中可能需要使用原Native模块或第三方库
           
-          // u6a21u62dfu97f3u9891u6570u636eu7684u751fu6210
+          // 模拟音频数据的生成
           this.simulateAudioData();
         }
       }
     } catch (error) {
-      console.error('u5904u7406u97f3u9891u6570u636eu9519u8bef:', error);
+      console.error('处理音频数据错误:', error);
     }
   }
   
   /**
-   * u6a21u62dfu97f3u9891u6570u636eu751fu6210
-   * u6ce8u610fuff1au5b9eu9645u9879u76eeu4e2du9700u8981u66ffu6362u6210u771fu5b9eu7684u97f3u9891u6570u636eu91c7u96c6
+   * 模拟音频数据生成
+   * 注意：实际项目中需要替换成真实的音频数据采集
    */
   private simulateAudioData() {
     if (!this.processor) return;
     
-    // u521bu5efau4e00u4e2au6a21u62dfu7684u97f3u9891u6570u636eu7247u6bb5uff0cu5b9eu9645u5e94u7528u4e2du9700u8981u66ffu6362u6210u771fu5b9eu91c7u96c6u5230u7684u97f3u9891u6570u636e
+    // 创建一个模拟的音频数据片段，实际应用中需要替换成真实采集到的音频数据
     const bufferSize = 1024;
     const data = new Float32Array(bufferSize);
     
-    // u968fu673au751fu6210u4e00u4e9bu6570u636eu4e3au4e86u6d4bu8bd5
+    // 随机生成一些数据用于测试
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.1; // u4f4eu5e45u5ea6u5566u58f0
+      data[i] = (Math.random() * 2 - 1) * 0.1; // 低幅度噪声
     }
     
-    // u6dfbu52a0u5230u5904u7406u5668
+    // 模拟5%的概率生成猫叫声
+    if (Math.random() < 0.05) {
+      // 模拟猫叫声 - 生成一个600Hz的正弦波
+      const freq = 600 + Math.random() * 100; // 550-650Hz的正弦波
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.sin(2 * Math.PI * freq * i / 44100) * 0.5;
+      }
+    }
+    
+    // 添加到处理器
     this.processor.addAudioData(data);
   }
   
   /**
-   * u5904u7406u97f3u9891u7f13u51b2u533a
+   * 处理音频缓冲区
    */
-  private processAudioBuffer() {
+  private processAudioBuffer(): void {
     if (!this.processor || !this.isListening) {
       return;
     }
     
-    // u68c0u67e5u662fu5426u9700u8981u5904u7406u97f3u9891
+    // 检查是否需要处理音频
     if (this.processor.shouldProcessAudio()) {
       this.setState(MeowDetectorState.Processing);
       
-      // u5904u7406u97f3u9891
-      const result = this.processor.processAudio();
+      // 获取缓冲区数据
+      const audioData = this.processor.getAudioBuffer();
       
-      // u5982u679cu68c0u6d4bu5230u732bu53eb
-      if (result.isMeow) {
-        this.setState(MeowDetectorState.Detected);
+      if (this.useNativeModule && MeowDetectorNative) {
+        // 使用原生模块处理音频
+        console.log('使用原生模块处理音频数据，长度:', audioData.length);
         
-        console.log('u68c0u6d4bu5230u732bu53ebu58f0:', result);
+        // 将Float32Array转换为普通数组，因为React Native桥接不支持TypedArray
+        const dataArray = Array.from(audioData);
         
-        // u89e6u53d1u68c0u6d4bu56deu8c03
-        if (this.config.onMeowDetected) {
-          this.config.onMeowDetected(result);
-        }
-        
-        // u8c03u7528u767eu70bcSDK
-        this.callBaiLianSDK(result);
+        MeowDetectorNative.processAudio(dataArray)
+          .then((result: string) => {
+            try {
+              const analysisResult = JSON.parse(result);
+              
+              // 处理分析结果
+              if (analysisResult.status === 'success' && analysisResult.emotion) {
+                if (this.config.onMeowDetected) {
+                  this.config.onMeowDetected({
+                    isMeow: true,
+                    emotion: analysisResult.emotion,
+                    confidence: analysisResult.confidence,
+                    features: analysisResult.features
+                  });
+                }
+                
+                this.setState(MeowDetectorState.Detected);
+              } else {
+                console.log('分析结果:', analysisResult);
+              }
+            } catch (error) {
+              console.error('解析分析结果失败:', error);
+            }
+          })
+          .catch((error: Error) => {
+            console.error('原生模块处理音频失败:', error);
+            if (this.config.onError) {
+              this.config.onError(error);
+            }
+          });
       } else {
-        this.setState(MeowDetectorState.Recording);
+        // 使用JavaScript处理音频
+        this.processAudioWithJS(audioData);
       }
+      
+      // 清空处理器缓冲区
+      this.processor.clearBuffer();
     }
   }
   
   /**
-   * u8c03u7528u767eu70bcSDK
+   * 使用JavaScript处理音频
    */
-  private async callBaiLianSDK(result: AudioAnalysisResult) {
-    if (!this.baiLianSDK) {
-      console.warn('u767eu70bcSDKu672au521du59cbu5316');
-      return;
-    }
+  private processAudioWithJS(audioData: Float32Array): void {
+    // 这里是JavaScript的音频处理逻辑
+    // 实际项目中可能需要更复杂的算法
     
-    try {
-      // u6784u5efau63d0u793au6587u672c
-      let prompt = 'u68c0u6d4bu5230u732bu53ebu58f0';
+    // 简单的能量检测示例
+    let energy = 0;
+    for (let i = 0; i < audioData.length; i++) {
+      energy += audioData[i] * audioData[i];
+    }
+    energy /= audioData.length;
+    
+    // 简单阈值判断
+    const isMeow = energy > 0.01;
+    
+    if (isMeow) {
+      // 创建符合 AudioFeatures 接口的特征对象
+      const features: AudioFeatures = {
+        Duration: audioData.length / 44100,
+        Energy: energy,
+        RootMeanSquare: Math.sqrt(energy),
+        ZeroCrossRate: 0.01, // 简化值
+        PeakFreq: 600,       // 简化值
+        FundamentalFreq: 600, // 简化值
+        Pitch: 600,          // 简化值
+        SpectralCentroid: 1000, // 简化值
+        SpectralRolloff: 2000   // 简化值
+      };
       
-      if (result.emotion) {
-        prompt += `uff0cu60c5u611fu5206u6790u7ed3u679cu4e3a: ${result.emotion}`;
-        if (result.confidence) {
-          prompt += `uff0cu7f6eu4fe1u5ea6: ${(result.confidence * 100).toFixed(2)}%`;
-        }
+      // 触发回调
+      if (this.config.onMeowDetected) {
+        this.config.onMeowDetected({
+          isMeow: true,
+          emotion: 'unknown', // JavaScript版本不提供情感分析
+          confidence: 0.5,
+          features: features
+        });
       }
       
-      // u8c03u7528u767eu70bcSDK
-      const response = await this.baiLianSDK.sendTextMessage(prompt);
-      
-      // u5904u7406u54cdu5e94
-      console.log('u767eu70bcSDKu54cdu5e94:', response);
-      
-      // u56deu8c03u5206u6790u7ed3u679c
-      if (this.config.onAnalysisResult && response.output && response.output.text) {
-        this.config.onAnalysisResult(response.output.text);
-      }
-      
-    } catch (error) {
-      console.error('u8c03u7528u767eu70bcSDKu5931u8d25:', error);
-      if (this.config.onError) {
-        this.config.onError(error as Error);
-      }
+      this.setState(MeowDetectorState.Detected);
     }
   }
   
   /**
-   * u505cu6b62u5f55u97f3u548cu68c0u6d4b
+   * 停止录音和检测
    */
   public async stopListening(): Promise<void> {
     if (!this.isListening) {
       return;
     }
     
-    try {
-      // u6e05u9664u5904u7406u5668u5b9au65f6u5668
-      if (this.processingInterval) {
-        clearInterval(this.processingInterval);
-        this.processingInterval = null;
-      }
-      
-      // u505cu6b62u5f55u97f3
-      if (this.recording) {
+    // 清除定时器
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+    }
+    
+    // 停止录音
+    if (this.recording) {
+      try {
         await this.recording.stopAndUnloadAsync();
-        this.recording = null;
+      } catch (error) {
+        console.error('停止录音失败:', error);
       }
-      
-      // u91cdu7f6eu5904u7406u5668
-      if (this.processor) {
-        this.processor.reset();
-      }
-      
-      this.isListening = false;
-      this.setState(MeowDetectorState.Idle);
-      console.log('u505cu6b62u76d1u542cu732bu53eb');
-      
-    } catch (error) {
-      console.error('u505cu6b62u97f3u9891u6355u6349u5931u8d25:', error);
-      if (this.config.onError) {
-        this.config.onError(error as Error);
-      }
+      this.recording = null;
     }
-  }
-  
-  /**
-   * u5207u6362u76d1u542cu72b6u6001
-   */
-  public async toggleListening(): Promise<void> {
-    if (this.isListening) {
-      await this.stopListening();
-    } else {
-      await this.startListening();
-    }
-  }
-  
-  /**
-   * u91cau653eu8d44u6e90
-   */
-  public async release(): Promise<void> {
-    await this.stopListening();
-    this.processor = null;
-    this.baiLianSDK = null;
+    
+    // 重置状态
+    this.isListening = false;
+    this.setState(MeowDetectorState.Idle);
+    
+    console.log('停止监听猫叫');
   }
 }

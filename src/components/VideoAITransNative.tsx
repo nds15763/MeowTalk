@@ -6,8 +6,9 @@ import { create } from 'zustand';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import MeowDetector, { MeowDetectorRef, MeowDetectorState } from '../sdk/meowDetector';
-import { AudioFeatures } from '../sdk/audioTypes';
+import { AudioFeatures, AudioAnalysisResult } from '../sdk/audioTypes';
 import { MoonShotService } from '../sdk/MoonShot';
+import { MeowDetectorModule } from '../sdk/MeowDetectorModule';
 
 // 定义视频状态枚举
 export enum VideoState {
@@ -240,10 +241,44 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
   const frameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const meowDetectorRef = useRef<MeowDetectorRef | null>(null);
   const meowAIServiceRef = useRef<MoonShotService | null>(null);
+  const meowDetectorModuleRef = useRef<MeowDetectorModule | null>(null);
   
   // 初始化AI服务
   useEffect(() => {
     meowAIServiceRef.current = new MoonShotService();
+    
+    // 初始化猫叫检测模块
+    meowDetectorModuleRef.current = new MeowDetectorModule({
+      audioProcessorConfig: {
+        sampleRate: 44100,
+        silenceThreshold: 0.02,
+        minSilenceTime: 0.3,
+        minProcessTime: 1.0,
+        maxBufferTime: 5.0
+      },
+      onStateChange: (state) => {
+        console.log('猫叫检测模块状态改变:', state);
+      },
+      onMeowDetected: (result) => {
+        if (result.isMeow && result.features) {
+          console.log('检测到猫叫，特征数据:', result.features, '情感:', result.emotion);
+          setMeowFeatures(result.features);
+          
+          // 在检测到猫叫时立即捕获一张图片
+          captureImage(result.features);
+        }
+      },
+      onError: (error) => {
+        console.error('猫叫检测模块错误:', error);
+      }
+    });
+    
+    // 组件卸载时停止猫叫检测
+    return () => {
+      if (meowDetectorModuleRef.current) {
+        meowDetectorModuleRef.current.stopListening();
+      }
+    };
   }, []);
   
   // 处理猫叫检测结果的回调函数
@@ -365,17 +400,17 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
     // 更新状态为录制中
     useVideoStore.getState().setVideoState(VideoState.Capturing);
     
-    // 启动猫叫检测器
-    if (meowDetectorRef.current) {
-      meowDetectorRef.current.startListening();
+    // 启动猫叫检测模块
+    if (meowDetectorModuleRef.current) {
+      meowDetectorModuleRef.current.startListening();
     }
   };
   
   // 结束通话/录制
   const handleEndCall = async () => {
-    // 停止猫叫检测器
-    if (meowDetectorRef.current) {
-      meowDetectorRef.current.stopListening();
+    // 停止猫叫检测模块
+    if (meowDetectorModuleRef.current) {
+      meowDetectorModuleRef.current.stopListening();
     }
     
     // 重置状态
@@ -474,11 +509,11 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit }) => {
         </TouchableOpacity>
         
         {/* 隐藏猫叫检测器UI，只保留功能 */}
-        <MeowDetector 
+        {/* <MeowDetector 
           ref={meowDetectorRef}
           showUI={false}
           onMeowDetected={handleMeowDetected}
-        />
+        /> */}
       </View>
     </SafeAreaView>
   );
