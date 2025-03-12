@@ -3,21 +3,24 @@
  * 提供猫叫检测功能，适用于React Native
  */
 
-import { Audio } from 'expo-av';
-import { AudioFeatures, AudioAnalysisResult } from './audioTypes';
-import { AudioProcessor } from './audioProcessor';
-import { AliBaiLianSDK } from './aliBaiLianSDK';
-import { NativeModules, Platform } from 'react-native';
+import { Audio } from "expo-av";
+import { AudioFeatures, AudioAnalysisResult } from "./audioTypes";
+import { AudioProcessor } from "./audioProcessor";
+import { AliBaiLianSDK } from "./aliBaiLianSDK";
+import { NativeModules, Platform } from "react-native";
+import AudioDataManager from "./AudioDataManager";
 
 // 获取原生模块
 const { MeowDetectorNative } = NativeModules;
 
 // 定义猫叫检测器状态
 export enum MeowDetectorState {
-  Idle = 'idle',
-  Recording = 'recording',
-  Processing = 'processing',
-  Detected = 'detected'
+  Idle = "idle",
+  Listening = "listening",
+  Recording = "recording",
+  Processing = "processing",
+  Detected = "detected",
+  Error = "error",
 }
 
 // 模块配置
@@ -40,6 +43,8 @@ interface MeowDetectorConfig {
   onMeowDetected?: (result: AudioAnalysisResult) => void;
   onAnalysisResult?: (text: string) => void;
   onError?: (error: Error) => void;
+  onStarted?: () => void;
+  onStopped?: () => void;
 }
 
 /**
@@ -55,36 +60,48 @@ export class MeowDetectorModule {
   private config: MeowDetectorConfig;
   private audioBuffer: Float32Array = new Float32Array();
   private useNativeModule: boolean = false;
-  
+  private mediaStream: MediaStream | null = null;
+  private audioContext: AudioContext | null = null;
+  private audioAnalyser: AnalyserNode | null = null;
+  private audioDataArray: Uint8Array | null = null;
+  private animationFrame: number | null = null;
+
   /**
    * 创建猫叫检测器模块
    */
   constructor(config: MeowDetectorConfig = {}) {
     this.config = config;
-    
+
     // 检查是否可以使用原生模块
-    this.useNativeModule = Platform.OS === 'android' && !!MeowDetectorNative;
-    console.log(`使用原生模块: ${this.useNativeModule ? '是' : '否'}`);
-    
+    this.useNativeModule = Platform.OS === "android" && !!MeowDetectorNative;
+    console.log(`使用原生模块: ${this.useNativeModule ? "是" : "否"}`);
+
     // 初始化音频处理器
     this.processor = new AudioProcessor(config.audioProcessorConfig);
     
+    // 初始化音频数据管理器
+    AudioDataManager.getInstance().initProcessor(this.processor);
+
     // 初始化百炼SDK（如果配置了）
-    if (config.baiLianConfig && config.baiLianConfig.appId && config.baiLianConfig.apiKey) {
+    if (
+      config.baiLianConfig &&
+      config.baiLianConfig.appId &&
+      config.baiLianConfig.apiKey
+    ) {
       this.baiLianSDK = new AliBaiLianSDK({
         appId: config.baiLianConfig.appId,
-        apiKey: config.baiLianConfig.apiKey
+        apiKey: config.baiLianConfig.apiKey,
       });
     }
   }
-  
+
   /**
    * 获取当前状态
    */
   public getState(): MeowDetectorState {
     return this.state;
   }
-  
+
   /**
    * 设置状态并触发回调
    */
@@ -94,23 +111,20 @@ export class MeowDetectorModule {
       this.config.onStateChange(newState);
     }
   }
-  
+
   /**
    * 开始录音和检测
    */
   public async startListening(): Promise<void> {
-    if (this.isListening) {
-      console.log('已经在监听中');
+    if (this.state !== MeowDetectorState.Idle) {
+      console.log("已经在监听中，请先停止");
       return;
     }
-    
+
     try {
-      // 请求录音权限
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        throw new Error('需要录音权限');
-      }
-      
+      this.setState(MeowDetectorState.Listening);
+      console.log("开始配置音频会话...");
+
       // 配置音频会话
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -118,23 +132,23 @@ export class MeowDetectorModule {
         staysActiveInBackground: false,
         shouldDuckAndroid: false,
       });
-      
+
       // 创建录音实例
       this.recording = new Audio.Recording();
       await this.recording.prepareToRecordAsync({
         android: {
-          extension: '.m4a',
+          extension: ".m4a",
           outputFormat: Audio.AndroidOutputFormat.AAC_ADTS,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 4410,
+          sampleRate: 4410, // 修改采样率
           numberOfChannels: 1,
           bitRate: 16 * 4410,
         },
         ios: {
-          extension: '.m4a',
+          extension: ".m4a",
           outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
           audioQuality: Audio.IOSAudioQuality.MEDIUM,
-          sampleRate: 4410,
+          sampleRate: 4410, // 修改采样率
           numberOfChannels: 1,
           bitRate: 16 * 4410,
           linearPCMBitDepth: 16,
@@ -142,34 +156,38 @@ export class MeowDetectorModule {
           linearPCMIsFloat: false,
         },
         web: {
-          mimeType: 'audio/webm',
+          mimeType: "audio/webm",
           bitsPerSecond: 16 * 4410,
         },
       });
-      
+
       // 绑定更新事件
       this.recording.setOnRecordingStatusUpdate(this.onRecordingStatusUpdate);
-      
+
       // 开始录音
       await this.recording.startAsync();
       this.isListening = true;
       this.setState(MeowDetectorState.Recording);
-      
+
       // 设置定时处理
       this.processingInterval = setInterval(() => {
         this.processAudioBuffer();
-      }, 100); // 缩短处理间隔以提高响应速度
-      
-      console.log('开始监听猫叫');
-      
+      }, 100); // 修改处理间隔
+
+      console.log("开始监听猫叫");
+
+      // Web平台使用Web Audio API获取真实音频数据
+      if (Platform.OS === "web") {
+        this.setupWebAudio();
+      }
     } catch (error) {
-      console.error('启动音频捕捉失败:', error);
+      console.error("启动音频捕捉失败:", error);
       if (this.config.onError) {
         this.config.onError(error as Error);
       }
     }
   }
-  
+
   /**
    * 录音状态更新回调
    */
@@ -177,7 +195,7 @@ export class MeowDetectorModule {
     if (!status.isRecording) {
       return;
     }
-    
+
     try {
       // 获取最新音频数据
       if (this.recording && status.isRecording) {
@@ -187,241 +205,381 @@ export class MeowDetectorModule {
             // 从原生层获取音频数据
             const audioData = await MeowDetectorNative.getAudioData();
             if (audioData && audioData.length > 0) {
-              // 将音频数据添加到处理器
-              this.processor?.addAudioData(new Float32Array(audioData));
-              console.log('成功获取音频数据，长度:', audioData.length);
+              // 使用音频数据管理器处理原生音频数据
+              AudioDataManager.getInstance().processNativeAudioData(audioData);
+              console.log("成功获取音频数据，长度:", audioData.length);
             } else {
-              console.log('没有新的音频数据');
+              console.log("没有新的音频数据");
             }
           } catch (error) {
-            console.error('获取音频数据失败:', error);
+            console.error("获取音频数据失败:", error);
           }
-        } else if (Platform.OS === 'web') {
+        } else if (Platform.OS === "web") {
           // Web 平台使用模拟音频数据
-          this.simulateAudioData();
+          AudioDataManager.getInstance().simulateAudioData();
         } else {
           // 如果不能使用原生模块，使用模拟数据
-          console.log('非原生平台，使用模拟音频数据');
-          this.simulateAudioData();
+          console.log("非原生平台，使用模拟音频数据");
+          AudioDataManager.getInstance().simulateAudioData();
         }
       }
     } catch (error) {
-      console.error('处理音频数据错误:', error);
+      console.error("处理音频数据错误:", error);
       if (this.config.onError) {
         this.config.onError(error as Error);
       }
     }
-  }
-  
+  };
+
   /**
-   * 处理音频缓冲区
+   * 处理音频缓冲区中的数据
    */
-  private processAudioBuffer(): void {
-    if (!this.processor) {
-      return;
-    }
-    
-    // 获取处理器中的音频数据
-    const audioData = this.processor.getAudioBuffer();
-    
-    if (!audioData || audioData.length === 0) {
-      console.log('音频缓冲区为空');
-      return;
-    }
-    
-    // 记录处理的音频数据长度
-    console.log(`处理音频数据，长度: ${audioData.length}，持续时间: ${audioData.length / 4410}秒`);
-    
-    // 检查是否需要处理音频
-    if (this.processor.shouldProcessAudio()) {
-      // 如果可以使用原生模块，则使用原生模块处理音频
-      if (this.useNativeModule && MeowDetectorNative) {
-        // 将Float32Array转换为普通数组，以便传递给原生模块
-        const dataArray = Array.from(audioData);
-        console.log('使用原生模块处理音频数据');
-        
-        MeowDetectorNative.processAudio(dataArray)
-          .then((result: string) => {
-            try {
-              const analysisResult = JSON.parse(result);
-              
-              // 无论结果如何，都输出详细的音频分析信息
-              console.log('音频分析结果:', JSON.stringify(analysisResult, null, 2));
-              
-              // 处理分析结果
-              if (analysisResult.status === 'success') {
-                if (analysisResult.isMeow) {
-                  console.log(`检测到猫叫，情感: ${analysisResult.emotion}, 可信度: ${analysisResult.confidence}`);
-                  console.log('音频特征:', JSON.stringify(analysisResult.features, null, 2));
-                  
-                  if (this.config.onMeowDetected) {
-                    this.config.onMeowDetected({
-                      isMeow: true,
-                      emotion: analysisResult.emotion,
-                      confidence: analysisResult.confidence,
-                      features: analysisResult.features
-                    });
-                  }
-                  
-                  this.setState(MeowDetectorState.Detected);
-                } else {
-                  console.log('未检测到猫叫，分析特征:', JSON.stringify(analysisResult.features, null, 2));
-                  
-                  // 即使没有检测到猫叫，也可以选择触发回调，但isMeow为false
-                  if (this.config.onMeowDetected) {
-                    this.config.onMeowDetected({
-                      isMeow: false,
-                      emotion: 'none',
-                      confidence: 0,
-                      features: analysisResult.features
-                    });
-                  }
-                }
-              } else {
-                console.log('分析结果异常:', analysisResult);
-              }
-            } catch (error) {
-              console.error('解析分析结果失败:', error);
-            }
-          })
-          .catch((error: Error) => {
-            console.error('原生模块处理音频失败:', error);
-            if (this.config.onError) {
-              this.config.onError(error);
-            }
-          });
-      } else {
-        // 使用JavaScript处理音频
-        this.processAudioWithJS(audioData);
-      }
-      
-      // 清空处理器缓冲区
-      this.processor.clearBuffer();
-    } else {
-      console.log('音频数据未达到处理条件，继续收集');
-    }
-  }
-  
-  /**
-   * 模拟音频数据生成
-   * 用于测试和调试目的
-   */
-  private simulateAudioData() {
+  private async processAudioBuffer(): Promise<void> {
+    // 确保有处理器和数据
     if (!this.processor) return;
-    
-    // 创建一个模拟的音频数据片段
-    const bufferSize = 1024;
-    const data = new Float32Array(bufferSize);
-    
-    // 随机生成一些数据用于测试
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.1; // 低幅度噪声
+
+    // 获取缓冲区数据
+    const audioData = this.processor.getAudioBuffer();
+
+    // 计算实际持续时间（秒）
+    const durationSeconds = audioData.length / 4410; // 使用正确的采样率4410Hz
+
+    // 日志输出缓冲区状态
+    console.log(
+      `处理音频数据，长度: ${
+        audioData.length
+      }，持续时间: ${durationSeconds.toFixed(2)}秒，采样率: 4410Hz`
+    );
+
+    // 确定是否需要处理音频
+    let shouldProcess = false;
+
+    // 条件1: 至少有2秒的数据
+    if (durationSeconds >= 2.0) {
+      shouldProcess = true;
+      console.log("条件满足: 至少2秒数据");
     }
-    
-    // 模拟5%的概率生成猫叫声
-    if (Math.random() < 0.05) {
-      // 模拟猫叫声 - 生成一个600Hz的正弦波
-      const freq = 600 + Math.random() * 100; // 550-650Hz的正弦波
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.sin(2 * Math.PI * freq * i / 4410) * 0.5;
+
+    // 条件2: 自上次处理已经过去了至少2秒（强制处理）
+    const timeSinceLastProcess =
+      (Date.now() - this.processor.getLastProcessTime()) / 1000;
+    if (timeSinceLastProcess >= 2.0 && durationSeconds >= 1.0) {
+      shouldProcess = true;
+      console.log(
+        `条件满足: 距离上次处理已过去${timeSinceLastProcess.toFixed(1)}秒`
+      );
+    }
+
+    // 如果不满足处理条件
+    if (!shouldProcess) {
+      console.log("音频数据未达到处理条件，继续收集");
+      return;
+    }
+
+    // 备份当前音频数据用于后续处理
+    const audioDataBackup = new Float32Array(audioData);
+
+    // 开始处理音频数据
+    if (this.useNativeModule && MeowDetectorNative) {
+      // 使用原生模块处理音频
+      this.setState(MeowDetectorState.Processing);
+
+      MeowDetectorNative.processAudio(Array.from(audioData))
+        .then((result: string) => {
+          try {
+            const analysisResult = JSON.parse(result);
+
+            // 无论结果如何，都输出详细的音频分析信息
+            console.log(
+              "音频分析结果:",
+              JSON.stringify(analysisResult, null, 2)
+            );
+
+            // 处理分析结果
+            if (analysisResult.status === "success") {
+              if (analysisResult.isMeow) {
+                console.log(
+                  `检测到猫叫，情感: ${analysisResult.emotion}, 可信度: ${analysisResult.confidence}`
+                );
+                console.log(
+                  "音频特征:",
+                  JSON.stringify(analysisResult.features, null, 2)
+                );
+
+                if (this.config.onMeowDetected) {
+                  this.config.onMeowDetected({
+                    isMeow: true,
+                    emotion: analysisResult.emotion,
+                    confidence: analysisResult.confidence,
+                    features: analysisResult.features,
+                  });
+                }
+
+                this.setState(MeowDetectorState.Detected);
+              } else {
+                console.log(
+                  "未检测到猫叫，分析特征:",
+                  JSON.stringify(analysisResult.features, null, 2)
+                );
+
+                // 即使没有检测到猫叫，也可以选择触发回调，但isMeow为false
+                if (this.config.onMeowDetected) {
+                  this.config.onMeowDetected({
+                    isMeow: false,
+                    emotion: "none",
+                    confidence: 0,
+                    features: analysisResult.features,
+                  });
+                }
+              }
+            } else {
+              console.log("分析结果异常:", analysisResult);
+            }
+
+            // 清空处理器缓冲区
+            if (this.processor) {
+              this.processor.clearBuffer();
+
+              // 保存最近 0.5 秒的音频数据作为重叠
+              const samplesToKeep = Math.floor(0.5 * 4410); // 0.5秒的数据量
+              if (audioDataBackup.length > samplesToKeep) {
+                const newBuffer = audioDataBackup.slice(-samplesToKeep);
+                this.processor.addAudioData(newBuffer);
+                console.log(
+                  `保留最近 ${(samplesToKeep / 4410).toFixed(
+                    2
+                  )} 秒的音频数据作为重叠`
+                );
+              }
+            }
+          } catch (error) {
+            console.error("解析分析结果失败:", error);
+          }
+        })
+        .catch((error: Error) => {
+          console.error("原生模块处理音频失败:", error);
+          if (this.config.onError) {
+            this.config.onError(error);
+          }
+        });
+    } else {
+      // 使用JavaScript处理音频
+      this.processAudioWithJS(audioDataBackup);
+
+      // 清空处理器缓冲区
+      if (this.processor) {
+        this.processor.clearBuffer();
+
+        // 保存最近 0.5 秒的音频数据作为重叠
+        const samplesToKeep = Math.floor(0.5 * 4410); // 0.5秒的数据量
+        if (audioDataBackup.length > samplesToKeep) {
+          const newBuffer = audioDataBackup.slice(-samplesToKeep);
+          this.processor.addAudioData(newBuffer);
+          console.log(
+            `保留最近 ${(samplesToKeep / 4410).toFixed(2)} 秒的音频数据作为重叠`
+          );
+        }
       }
     }
-    
-    // 添加到处理器
-    this.processor.addAudioData(data);
-    console.log('添加模拟音频数据，长度:', bufferSize);
   }
-  
+
   /**
    * 使用JavaScript处理音频
    */
   private processAudioWithJS(audioData: Float32Array): void {
+    if (!this.processor) return;
+
     // 这里是JavaScript的音频处理逻辑
     // 实际项目中可能需要更复杂的算法
-    
+
     // 简单的能量检测示例
     let energy = 0;
     for (let i = 0; i < audioData.length; i++) {
       energy += audioData[i] * audioData[i];
     }
     energy /= audioData.length;
-    
+
     // 创建符合 AudioFeatures 接口的特征对象
     const features: AudioFeatures = {
       Duration: audioData.length / 4410,
       Energy: energy,
       RootMeanSquare: Math.sqrt(energy),
       ZeroCrossRate: 0.01, // 简化值
-      PeakFreq: 600,       // 简化值
+      PeakFreq: 600, // 简化值
       FundamentalFreq: 600, // 简化值
-      Pitch: 600,          // 简化值
+      Pitch: 600, // 简化值
       SpectralCentroid: 1000, // 简化值
-      SpectralRolloff: 2000   // 简化值
+      SpectralRolloff: 2000, // 简化值
     };
-    
+
     // 输出音频特征用于调试
-    console.log('JS处理音频特征:', JSON.stringify(features, null, 2));
-    
+    console.log("JS处理音频特征:", JSON.stringify(features, null, 2));
+
     // 简单阈值判断
     const isMeow = energy > 0.01;
-    
+
     if (isMeow) {
-      console.log('JS检测到猫叫，能量值:', energy);
-      
+      console.log("JS检测到猫叫，能量值:", energy);
+
       // 触发回调
       if (this.config.onMeowDetected) {
         this.config.onMeowDetected({
           isMeow: true,
-          emotion: 'unknown', // JavaScript版本不提供情感分析
+          emotion: "unknown", // JavaScript版本不提供情感分析
           confidence: 0.5,
-          features: features
+          features: features,
         });
       }
-      
+
       this.setState(MeowDetectorState.Detected);
     } else {
-      console.log('JS未检测到猫叫，能量值:', energy);
-      
+      console.log("JS未检测到猫叫，能量值:", energy);
+
       // 即使没有检测到猫叫，也触发回调，但isMeow为false
       if (this.config.onMeowDetected) {
         this.config.onMeowDetected({
           isMeow: false,
-          emotion: 'none',
+          emotion: "none",
           confidence: 0,
-          features: features
+          features: features,
         });
       }
     }
   }
-  
+
+  /**
+   * Web平台使用Web Audio API获取真实音频数据
+   */
+  private async setupWebAudio(): Promise<void> {
+    try {
+      // 获取麦克风访问权限并创建媒体流
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaStream = stream;
+
+      // 创建AudioContext和分析器
+      const audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
+      this.audioContext = audioContext;
+
+      // 创建分析器节点
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 2048;
+      this.audioAnalyser = analyser;
+
+      // 创建音频源并连接到分析器
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      // 准备数据数组
+      const bufferLength = analyser.frequencyBinCount;
+      this.audioDataArray = new Uint8Array(bufferLength);
+
+      // 开始周期性采集音频数据
+      this.startAudioCapture();
+
+      console.log("Web Audio API 初始化成功，开始采集真实音频数据");
+    } catch (error) {
+      console.error("初始化Web Audio API失败:", error);
+      // 降级到模拟数据
+      AudioDataManager.getInstance().simulateAudioData();
+
+      if (this.config.onError) {
+        this.config.onError(error as Error);
+      }
+    }
+  }
+
+  /**
+   * 开始周期性采集Web音频数据
+   */
+  private startAudioCapture(): void {
+    if (!this.audioAnalyser || !this.audioDataArray) {
+      console.error("音频分析器未初始化");
+      return;
+    }
+
+    // 定义采集函数
+    const captureAudio = () => {
+      if (this.state !== MeowDetectorState.Listening) return;
+
+      // 获取频域数据
+      this.audioAnalyser!.getByteFrequencyData(this.audioDataArray!);
+
+      // 使用AudioDataManager处理Web Audio API数据
+      AudioDataManager.getInstance().processWebAudioData(this.audioDataArray!);
+
+      // 继续下一帧采集
+      this.animationFrame = requestAnimationFrame(captureAudio);
+    };
+
+    // 开始采集
+    this.animationFrame = requestAnimationFrame(captureAudio);
+  }
+
   /**
    * 停止录音和检测
    */
   public async stopListening(): Promise<void> {
-    if (!this.isListening) {
+    if (this.state === MeowDetectorState.Idle) {
+      console.log("已经停止监听");
       return;
     }
-    
-    // 清除定时器
-    if (this.processingInterval) {
-      clearInterval(this.processingInterval);
-      this.processingInterval = null;
-    }
-    
-    // 停止录音
-    if (this.recording) {
-      try {
-        await this.recording.stopAndUnloadAsync();
-      } catch (error) {
-        console.error('停止录音失败:', error);
+
+    try {
+      // 清除定时器
+      if (this.processingInterval) {
+        clearInterval(this.processingInterval);
+        this.processingInterval = null;
       }
-      this.recording = null;
+
+      // 停止录音
+      if (this.recording) {
+        await this.recording.stopAndUnloadAsync();
+        this.recording = null;
+        console.log("停止录音");
+      }
+
+      // 停止Web音频捕获
+      if (this.animationFrame) {
+        cancelAnimationFrame(this.animationFrame);
+        this.animationFrame = null;
+        console.log("停止Web音频捕获");
+      }
+
+      // 关闭AudioContext
+      if (this.audioContext) {
+        await this.audioContext.close();
+        this.audioContext = null;
+        console.log("关闭AudioContext");
+      }
+
+      // 停止媒体流
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach((track) => track.stop());
+        this.mediaStream = null;
+        console.log("停止媒体流");
+      }
+
+      // 清空处理器缓冲区
+      if (this.processor) {
+        this.processor.clearBuffer();
+      }
+
+      // 重置音频数据管理器
+      AudioDataManager.getInstance().reset();
+
+      this.setState(MeowDetectorState.Idle);
+      console.log("停止监听猫叫");
+
+      if (this.config.onStopped) {
+        this.config.onStopped();
+      }
+    } catch (error) {
+      console.error("停止监听失败:", error);
+
+      if (this.config.onError) {
+        this.config.onError(error as Error);
+      }
     }
-    
-    // 重置状态
-    this.isListening = false;
-    this.setState(MeowDetectorState.Idle);
-    
-    console.log('停止监听猫叫');
   }
 }

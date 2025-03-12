@@ -9,8 +9,11 @@ import sampleLibrary from './new_sample_library.json';
 // u9759u9ed8u68c0u6d4bu914du7f6e
 const SILENCE_THRESHOLD = 0.02;
 const MIN_SILENCE_TIME = 0.3; // u79d2
-const MIN_PROCESS_TIME = 1.0; // u79d2
+const MIN_PROCESS_TIME = 1.0; // u79d2 - u7a97u53e3u5927u5c0f
 const MAX_BUFFER_TIME = 5.0; // u79d2
+const WINDOW_STEP = 0.5; // u7a97u53e3u6b65u8fbdu5927u5c0fu4e3a0.5u79d2
+const WINDOWS_FOR_DETECTION = 3; // u4f7fu75283u4e2au7a97u53e3u5224u65adu4e00u6b21u732bu53eb
+
 
 /**
  * u97f3u9891u5904u7406u5668u7c7b
@@ -23,6 +26,7 @@ export class AudioProcessor {
   private minProcessTime: number;
   private maxBufferTime: number;
   private lastProcessTime: number;
+  private windowCount: number = 0; // u6dfbu52a0u7a97u53e3u8ba1u6570u5668
 
   constructor(options?: {
     sampleRate?: number;
@@ -31,7 +35,7 @@ export class AudioProcessor {
     minProcessTime?: number;
     maxBufferTime?: number;
   }) {
-    this.sampleRate = options?.sampleRate || 4410;
+    this.sampleRate = options?.sampleRate || 4410; // u6062u590du6807u51c6u91c7u6837u7387
     this.silenceThreshold = options?.silenceThreshold || SILENCE_THRESHOLD;
     this.minSilenceTime = options?.minSilenceTime || MIN_SILENCE_TIME;
     this.minProcessTime = options?.minProcessTime || MIN_PROCESS_TIME;
@@ -77,7 +81,12 @@ export class AudioProcessor {
     this.audioBuffer = new Float32Array();
     this.lastProcessTime = Date.now();
   }
-
+  /**
+   * 获取上次处理音频数据的时间
+   */
+  public getLastProcessTime(): number {
+    return this.lastProcessTime;
+  }
   /**
    * u5224u65adu662fu5426u9700u8981u5904u7406u97f3u9891
    */
@@ -90,17 +99,23 @@ export class AudioProcessor {
 
     // u6761u4ef61: u68c0u6d4bu5230u9759u9ed8u4e14u6709u8db3u591fu7684u7247u6bb5
     if (silenceDetected && segments.length > 0) {
-      return true;
+      this.windowCount = (this.windowCount + 1) % WINDOWS_FOR_DETECTION;
+      console.log(`u68c0u6d4bu5230u9759u9ed8uff0cu5f53u524du7a97u53e3u8ba1u6570: ${this.windowCount}/${WINDOWS_FOR_DETECTION}`);
+      return this.windowCount === 0; // u53eau6709u5f53u8ba1u6570u5668u5230u8fbe3u7684u500du6570u65f6u624du5904u7406
     }
 
     // u6761u4ef62: u7f13u51b2u533au8fbeu5230u6700u5927u7f13u51b2u65f6u95f4
     if (bufferDuration >= this.maxBufferTime) {
-      return true;
+      this.windowCount = (this.windowCount + 1) % WINDOWS_FOR_DETECTION;
+      console.log(`u7f13u51b2u533au5df2u6ee1uff0cu5f53u524du7a97u53e3u8ba1u6570: ${this.windowCount}/${WINDOWS_FOR_DETECTION}`);
+      return this.windowCount === 0; // u53eau6709u5f53u8ba1u6570u5668u5230u8fbe3u7684u500du6570u65f6u624du5904u7406
     }
 
     // u6761u4ef63: u8fbeu5230u6700u5c0fu5904u7406u65f6u95f4u4e14u8dddu79bbu4e0au6b21u5904u7406u8db3u591fu957f
-    if (bufferDuration >= this.minProcessTime && timeSinceLastProcess >= 0.5) {
-      return true;
+    if (bufferDuration >= this.minProcessTime && timeSinceLastProcess >= WINDOW_STEP) {
+      this.windowCount = (this.windowCount + 1) % WINDOWS_FOR_DETECTION;
+      console.log(`u5904u7406u5f53u524du7a97u53e3uff0cu6301u7eedu65f6u95f4: ${bufferDuration.toFixed(2)}u79d2uff0cu7a97u53e3u8ba1u6570: ${this.windowCount}/${WINDOWS_FOR_DETECTION}`);
+      return this.windowCount === 0; // u53eau6709u5f53u8ba1u6570u5668u5230u8fbe3u7684u500du6570u65f6u624du5904u7406
     }
 
     return false;
@@ -136,7 +151,7 @@ export class AudioProcessor {
     // u66f4u65b0u5904u7406u65f6u95f4
     this.lastProcessTime = Date.now();
 
-    // u786eu4fddu8fd4u56deu7684u97f3u9891u7279u5f81u683cu5f0fu4e0eu6240u9700u683cu5f0fu4e00u81f4
+    // u786eu4fddu8fd4u56deu7684u97f3u9891u7279u5f81u683cu5f0fu4e0eu6240u9700u683cu5f0fu4e01u81f4
     return { 
       isMeow, 
       emotion, 
@@ -466,7 +481,7 @@ export class AudioProcessor {
         for (const sample of emotionSamples) {
           if (!sample.Features) continue;
           
-          // u8ba1u7b97u7279u5f81u76f8u4f3cu5ea6u5206u6570
+          // u8ba1u7b97u7279u5f81u76f8u4f3cu5ea6
           const score = this.calculateFeaturesSimilarity(features, sample.Features);
           totalScore += score;
         }
@@ -529,3 +544,5 @@ export class AudioProcessor {
     return Math.max(0, 1 - diff / tolerance);
   }
 }
+
+export default AudioProcessor;
