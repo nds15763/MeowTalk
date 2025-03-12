@@ -31,7 +31,7 @@ export class AudioProcessor {
     minProcessTime?: number;
     maxBufferTime?: number;
   }) {
-    this.sampleRate = options?.sampleRate || 44100;
+    this.sampleRate = options?.sampleRate || 4410;
     this.silenceThreshold = options?.silenceThreshold || SILENCE_THRESHOLD;
     this.minSilenceTime = options?.minSilenceTime || MIN_SILENCE_TIME;
     this.minProcessTime = options?.minProcessTime || MIN_PROCESS_TIME;

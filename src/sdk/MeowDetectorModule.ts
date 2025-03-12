@@ -100,54 +100,52 @@ export class MeowDetectorModule {
    */
   public async startListening(): Promise<void> {
     if (this.isListening) {
+      console.log('已经在监听中');
       return;
     }
     
     try {
-      // 申请音频权限
-      await Audio.requestPermissionsAsync();
+      // 请求录音权限
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('需要录音权限');
+      }
       
-      // 设置音频模式
+      // 配置音频会话
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        interruptionModeIOS: 1, // 1 对应 DUCK_OTHERS 模式
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: 1, // 1 对应 DUCK_OTHERS 模式
-        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: false,
       });
       
-      // 准备录音
+      // 创建录音实例
       this.recording = new Audio.Recording();
-      
-      // 使用 expo-av 预设的录音选项
-      const recordingOptions = {
+      await this.recording.prepareToRecordAsync({
         android: {
           extension: '.m4a',
           outputFormat: Audio.AndroidOutputFormat.AAC_ADTS,
           audioEncoder: Audio.AndroidAudioEncoder.AAC,
-          sampleRate: 44100,
+          sampleRate: 4410,
           numberOfChannels: 1,
-          bitRate: 128000,
+          bitRate: 16 * 4410,
         },
         ios: {
           extension: '.m4a',
           outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
           audioQuality: Audio.IOSAudioQuality.MEDIUM,
-          sampleRate: 44100,
+          sampleRate: 4410,
           numberOfChannels: 1,
-          bitRate: 128000,
+          bitRate: 16 * 4410,
           linearPCMBitDepth: 16,
           linearPCMIsBigEndian: false,
           linearPCMIsFloat: false,
         },
         web: {
           mimeType: 'audio/webm',
-          bitsPerSecond: 128000,
+          bitsPerSecond: 16 * 4410,
         },
-      };
-      
-      await this.recording.prepareToRecordAsync(recordingOptions);
+      });
       
       // 绑定更新事件
       this.recording.setOnRecordingStatusUpdate(this.onRecordingStatusUpdate);
@@ -160,7 +158,7 @@ export class MeowDetectorModule {
       // 设置定时处理
       this.processingInterval = setInterval(() => {
         this.processAudioBuffer();
-      }, 500);
+      }, 100); // 缩短处理间隔以提高响应速度
       
       console.log('开始监听猫叫');
       
@@ -183,91 +181,104 @@ export class MeowDetectorModule {
     try {
       // 获取最新音频数据
       if (this.recording && status.isRecording) {
-        const uri = this.recording.getURI();
-        if (uri) {
-          // 注意：这里的获取音频数据方式需要根据实际情况调整
-          // Expo的Audio API不直接提供原始音频数据访问
-          // 实际项目中可能需要使用原Native模块或第三方库
-          
-          // 模拟音频数据的生成
+        // 使用原生模块获取音频数据
+        if (this.useNativeModule && MeowDetectorNative) {
+          try {
+            // 从原生层获取音频数据
+            const audioData = await MeowDetectorNative.getAudioData();
+            if (audioData && audioData.length > 0) {
+              // 将音频数据添加到处理器
+              this.processor?.addAudioData(new Float32Array(audioData));
+              console.log('成功获取音频数据，长度:', audioData.length);
+            } else {
+              console.log('没有新的音频数据');
+            }
+          } catch (error) {
+            console.error('获取音频数据失败:', error);
+          }
+        } else if (Platform.OS === 'web') {
+          // Web 平台使用模拟音频数据
+          this.simulateAudioData();
+        } else {
+          // 如果不能使用原生模块，使用模拟数据
+          console.log('非原生平台，使用模拟音频数据');
           this.simulateAudioData();
         }
       }
     } catch (error) {
       console.error('处理音频数据错误:', error);
-    }
-  }
-  
-  /**
-   * 模拟音频数据生成
-   * 注意：实际项目中需要替换成真实的音频数据采集
-   */
-  private simulateAudioData() {
-    if (!this.processor) return;
-    
-    // 创建一个模拟的音频数据片段，实际应用中需要替换成真实采集到的音频数据
-    const bufferSize = 1024;
-    const data = new Float32Array(bufferSize);
-    
-    // 随机生成一些数据用于测试
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.1; // 低幅度噪声
-    }
-    
-    // 模拟5%的概率生成猫叫声
-    if (Math.random() < 0.05) {
-      // 模拟猫叫声 - 生成一个600Hz的正弦波
-      const freq = 600 + Math.random() * 100; // 550-650Hz的正弦波
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.sin(2 * Math.PI * freq * i / 44100) * 0.5;
+      if (this.config.onError) {
+        this.config.onError(error as Error);
       }
     }
-    
-    // 添加到处理器
-    this.processor.addAudioData(data);
   }
   
   /**
    * 处理音频缓冲区
    */
   private processAudioBuffer(): void {
-    if (!this.processor || !this.isListening) {
+    if (!this.processor) {
       return;
     }
     
+    // 获取处理器中的音频数据
+    const audioData = this.processor.getAudioBuffer();
+    
+    if (!audioData || audioData.length === 0) {
+      console.log('音频缓冲区为空');
+      return;
+    }
+    
+    // 记录处理的音频数据长度
+    console.log(`处理音频数据，长度: ${audioData.length}，持续时间: ${audioData.length / 4410}秒`);
+    
     // 检查是否需要处理音频
     if (this.processor.shouldProcessAudio()) {
-      this.setState(MeowDetectorState.Processing);
-      
-      // 获取缓冲区数据
-      const audioData = this.processor.getAudioBuffer();
-      
+      // 如果可以使用原生模块，则使用原生模块处理音频
       if (this.useNativeModule && MeowDetectorNative) {
-        // 使用原生模块处理音频
-        console.log('使用原生模块处理音频数据，长度:', audioData.length);
-        
-        // 将Float32Array转换为普通数组，因为React Native桥接不支持TypedArray
+        // 将Float32Array转换为普通数组，以便传递给原生模块
         const dataArray = Array.from(audioData);
+        console.log('使用原生模块处理音频数据');
         
         MeowDetectorNative.processAudio(dataArray)
           .then((result: string) => {
             try {
               const analysisResult = JSON.parse(result);
               
+              // 无论结果如何，都输出详细的音频分析信息
+              console.log('音频分析结果:', JSON.stringify(analysisResult, null, 2));
+              
               // 处理分析结果
-              if (analysisResult.status === 'success' && analysisResult.emotion) {
-                if (this.config.onMeowDetected) {
-                  this.config.onMeowDetected({
-                    isMeow: true,
-                    emotion: analysisResult.emotion,
-                    confidence: analysisResult.confidence,
-                    features: analysisResult.features
-                  });
+              if (analysisResult.status === 'success') {
+                if (analysisResult.isMeow) {
+                  console.log(`检测到猫叫，情感: ${analysisResult.emotion}, 可信度: ${analysisResult.confidence}`);
+                  console.log('音频特征:', JSON.stringify(analysisResult.features, null, 2));
+                  
+                  if (this.config.onMeowDetected) {
+                    this.config.onMeowDetected({
+                      isMeow: true,
+                      emotion: analysisResult.emotion,
+                      confidence: analysisResult.confidence,
+                      features: analysisResult.features
+                    });
+                  }
+                  
+                  this.setState(MeowDetectorState.Detected);
+                } else {
+                  console.log('未检测到猫叫，分析特征:', JSON.stringify(analysisResult.features, null, 2));
+                  
+                  // 即使没有检测到猫叫，也可以选择触发回调，但isMeow为false
+                  if (this.config.onMeowDetected) {
+                    this.config.onMeowDetected({
+                      isMeow: false,
+                      emotion: 'none',
+                      confidence: 0,
+                      features: analysisResult.features
+                    });
+                  }
                 }
-                
-                this.setState(MeowDetectorState.Detected);
               } else {
-                console.log('分析结果:', analysisResult);
+                console.log('分析结果异常:', analysisResult);
               }
             } catch (error) {
               console.error('解析分析结果失败:', error);
@@ -286,7 +297,39 @@ export class MeowDetectorModule {
       
       // 清空处理器缓冲区
       this.processor.clearBuffer();
+    } else {
+      console.log('音频数据未达到处理条件，继续收集');
     }
+  }
+  
+  /**
+   * 模拟音频数据生成
+   * 用于测试和调试目的
+   */
+  private simulateAudioData() {
+    if (!this.processor) return;
+    
+    // 创建一个模拟的音频数据片段
+    const bufferSize = 1024;
+    const data = new Float32Array(bufferSize);
+    
+    // 随机生成一些数据用于测试
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.1; // 低幅度噪声
+    }
+    
+    // 模拟5%的概率生成猫叫声
+    if (Math.random() < 0.05) {
+      // 模拟猫叫声 - 生成一个600Hz的正弦波
+      const freq = 600 + Math.random() * 100; // 550-650Hz的正弦波
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.sin(2 * Math.PI * freq * i / 4410) * 0.5;
+      }
+    }
+    
+    // 添加到处理器
+    this.processor.addAudioData(data);
+    console.log('添加模拟音频数据，长度:', bufferSize);
   }
   
   /**
@@ -303,22 +346,27 @@ export class MeowDetectorModule {
     }
     energy /= audioData.length;
     
+    // 创建符合 AudioFeatures 接口的特征对象
+    const features: AudioFeatures = {
+      Duration: audioData.length / 4410,
+      Energy: energy,
+      RootMeanSquare: Math.sqrt(energy),
+      ZeroCrossRate: 0.01, // 简化值
+      PeakFreq: 600,       // 简化值
+      FundamentalFreq: 600, // 简化值
+      Pitch: 600,          // 简化值
+      SpectralCentroid: 1000, // 简化值
+      SpectralRolloff: 2000   // 简化值
+    };
+    
+    // 输出音频特征用于调试
+    console.log('JS处理音频特征:', JSON.stringify(features, null, 2));
+    
     // 简单阈值判断
     const isMeow = energy > 0.01;
     
     if (isMeow) {
-      // 创建符合 AudioFeatures 接口的特征对象
-      const features: AudioFeatures = {
-        Duration: audioData.length / 44100,
-        Energy: energy,
-        RootMeanSquare: Math.sqrt(energy),
-        ZeroCrossRate: 0.01, // 简化值
-        PeakFreq: 600,       // 简化值
-        FundamentalFreq: 600, // 简化值
-        Pitch: 600,          // 简化值
-        SpectralCentroid: 1000, // 简化值
-        SpectralRolloff: 2000   // 简化值
-      };
+      console.log('JS检测到猫叫，能量值:', energy);
       
       // 触发回调
       if (this.config.onMeowDetected) {
@@ -331,6 +379,18 @@ export class MeowDetectorModule {
       }
       
       this.setState(MeowDetectorState.Detected);
+    } else {
+      console.log('JS未检测到猫叫，能量值:', energy);
+      
+      // 即使没有检测到猫叫，也触发回调，但isMeow为false
+      if (this.config.onMeowDetected) {
+        this.config.onMeowDetected({
+          isMeow: false,
+          emotion: 'none',
+          confidence: 0,
+          features: features
+        });
+      }
     }
   }
   

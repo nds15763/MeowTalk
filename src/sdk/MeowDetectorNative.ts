@@ -12,6 +12,12 @@ interface MeowDetectorNativeInterface {
    * @returns 包含分析结果的JSON字符串
    */
   processAudio(audioData: number[]): Promise<string>;
+
+  /**
+   * 获取原始音频数据
+   * @returns 返回Float32Array格式的音频数据
+   */
+  getAudioData(): Promise<number[]>;
 }
 
 // 获取原生模块
