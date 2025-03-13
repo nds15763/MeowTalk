@@ -42,8 +42,17 @@ type VideoContext = {
 };
 
 // 定义大模型接口类型
+export interface MeowEmotion {
+  emotion: string;  // 表示的情感
+  confidence: number; // 置信度，0-1范围
+}
+
+// 抽象的大模型调用服务
 export interface MeowAIModelResponse {
-  text: string;
+  text?: string;  // 机器翻译
+  is_meow?: boolean; // 是否有猫叫
+  emotions?: MeowEmotion[]; // 表情列表
+  most_likely_meaning?: string; // 最可能的意思
 }
 
 // 抽象的大模型调用服务
@@ -56,7 +65,13 @@ class MeowAIService {
     return new Promise((resolve) => {
       setTimeout(() => {
         resolve({
-          text: `分析结果: 这只猫咪可能在表达${Math.random() < 0.5 ? '饥饿' : '想要关注'}。它的音频特征显示声音频率为${audioFeatures.FundamentalFreq.toFixed(1)}Hz，持续时间为${audioFeatures.Duration.toFixed(2)}秒。`
+          text: `分析结果: 这只猫咪可能在表达${Math.random() < 0.5 ? '饥饿' : '想要关注'}。它的音频特征显示声音频率为${audioFeatures.FundamentalFreq.toFixed(1)}Hz，持续时间为${audioFeatures.Duration.toFixed(2)}秒。`,
+          is_meow: true,
+          emotions: [
+            { emotion: 'happy', confidence: 0.8 },
+            { emotion: 'sad', confidence: 0.2 }
+          ],
+          most_likely_meaning: '猫咪想要吃东西'
         });
       }, 1000);
     });

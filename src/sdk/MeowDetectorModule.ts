@@ -451,7 +451,7 @@ export class MeowDetectorModule {
     if (zeroCrossValid) validCount++;
     
     // 至少满足4个条件才认为是猫叫
-    const isMeow = validCount >= 4;
+    const isMeow = validCount >= 3;
     
     // 计算置信度 (0.0-1.0)
     const confidence = validCount / 5.0;
