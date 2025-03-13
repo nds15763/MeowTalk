@@ -389,58 +389,101 @@ export class MeowDetectorModule {
   private processAudioWithJS(audioData: Float32Array): void {
     if (!this.processor) return;
 
-    // 这里是JavaScript的音频处理逻辑
-    // 实际项目中可能需要更复杂的算法
-
-    // 简单的能量检测示例
+    // 计算能量
     let energy = 0;
     for (let i = 0; i < audioData.length; i++) {
       energy += audioData[i] * audioData[i];
     }
     energy /= audioData.length;
 
-    // 创建符合 AudioFeatures 接口的特征对象
-    const features: AudioFeatures = {
-      Duration: audioData.length / 4410,
-      Energy: energy,
-      RootMeanSquare: Math.sqrt(energy),
-      ZeroCrossRate: 0.01, // 简化值
-      PeakFreq: 600, // 简化值
-      FundamentalFreq: 600, // 简化值
-      Pitch: 600, // 简化值
-      SpectralCentroid: 1000, // 简化值
-      SpectralRolloff: 2000, // 简化值
-    };
+    // 使用AudioProcessor提取音频特征
+    let features: AudioFeatures;
+    if (this.processor) {
+      // 添加音频数据到处理器
+      this.processor.addAudioData(audioData);
+      
+      // 处理音频并提取特征
+      const result = this.processor.processAudio();
+      features = result.features;
+      
+      console.log("使用AudioProcessor提取的音频特征:", JSON.stringify(features, null, 2));
+    } else {
+      // 如果没有处理器，使用默认值
+      features = {
+        Duration: audioData.length / 4410,
+        Energy: energy,
+        RootMeanSquare: Math.sqrt(energy),
+        ZeroCrossRate: 0.01,
+        PeakFreq: 600,
+        FundamentalFreq: 600,
+        Pitch: 600,
+        SpectralCentroid: 1000,
+        SpectralRolloff: 2000,
+      };
+      console.log("使用默认值的音频特征:", JSON.stringify(features, null, 2));
+    }
 
     // 输出音频特征用于调试
     console.log("JS处理音频特征:", JSON.stringify(features, null, 2));
 
-    // 简单阈值判断
-    const isMeow = energy > 0.01;
+    // 多特征判断，参考Go版本的isCatMeow函数
+    // 1. 能量阈值检查
+    const energyValid = energy >= 100 && energy <= 1500;
+    
+    // 2. 音高范围检查（简化版）
+    const pitchValid = features.Pitch >= 200 && features.Pitch <= 800;
+    
+    // 3. 持续时间特征
+    const durationValid = features.Duration >= 0.5 && features.Duration <= 3.0;
+    
+    // 4. 谐波结构检查（简化版）
+    const centroidValid = features.SpectralCentroid >= 700 && features.SpectralCentroid <= 1800;
+    
+    // 5. 过零率检查
+    const zeroCrossValid = features.ZeroCrossRate >= 0.1 && features.ZeroCrossRate <= 0.25;
+    
+    // 计算有效特征数量
+    let validCount = 0;
+    if (energyValid) validCount++;
+    if (pitchValid) validCount++;
+    if (durationValid) validCount++;
+    if (centroidValid) validCount++;
+    if (zeroCrossValid) validCount++;
+    
+    // 至少满足4个条件才认为是猫叫
+    const isMeow = validCount >= 4;
+    
+    // 计算置信度 (0.0-1.0)
+    const confidence = validCount / 5.0;
+    
+    console.log("猫叫检测结果: 能量=", energyValid, ", 音高=", pitchValid, ", 持续时间=", durationValid, 
+      ", 谐波结构=", centroidValid, ", 过零率=", zeroCrossValid, ", 总得分=", validCount, "/5");
+
+    console.log("音频特征:", JSON.stringify(features, null, 2));
 
     if (isMeow) {
-      console.log("JS检测到猫叫，能量值:", energy);
+      console.log("JS检测到猫叫，置信度:", confidence);
 
       // 触发回调
       if (this.config.onMeowDetected) {
         this.config.onMeowDetected({
           isMeow: true,
           emotion: "unknown", // JavaScript版本不提供情感分析
-          confidence: 0.5,
+          confidence: confidence,
           features: features,
         });
       }
 
       this.setState(MeowDetectorState.Detected);
     } else {
-      console.log("JS未检测到猫叫，能量值:", energy);
+      console.log("JS未检测到猫叫，置信度:", confidence);
 
       // 即使没有检测到猫叫，也触发回调，但isMeow为false
       if (this.config.onMeowDetected) {
         this.config.onMeowDetected({
           isMeow: false,
           emotion: "none",
-          confidence: 0,
+          confidence: confidence,
           features: features,
         });
       }

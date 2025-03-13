@@ -35,7 +35,7 @@ export class AudioProcessor {
     minProcessTime?: number;
     maxBufferTime?: number;
   }) {
-    this.sampleRate = options?.sampleRate || 4410; // u6062u590du6807u51c6u91c7u6837u7387
+    this.sampleRate = 4410; // u6062u590du6807u51c6u91c7u6837u7387
     this.silenceThreshold = options?.silenceThreshold || SILENCE_THRESHOLD;
     this.minSilenceTime = options?.minSilenceTime || MIN_SILENCE_TIME;
     this.minProcessTime = options?.minProcessTime || MIN_PROCESS_TIME;
@@ -258,8 +258,9 @@ export class AudioProcessor {
     // u97f3u9ad8u4f30u8ba1
     const pitch = fundamentalFreq > 0 ? fundamentalFreq : peakFreq;
     
-    // u65f6u957fu7279u5f81
-    const duration = data.length / this.sampleRate;
+    // 时长特征 - 确保使用原始数据长度计算 先这么写吧
+
+    const duration = data.length / this.sampleRate /2;
     
     return {
       Duration: duration,
