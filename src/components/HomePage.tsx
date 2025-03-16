@@ -34,19 +34,12 @@ export default function HomePage() {
             >
               <Text style={styles.buttonText}>Translate</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.button, styles.aiTalkButton]}
-              onPress={() => navigation.navigate('VideoAITrans' as never)}
-            >
-              <Text style={styles.buttonText}>AI语音助手</Text>
-            </TouchableOpacity>
-            
+
             <TouchableOpacity
               style={[styles.button, styles.aiTalkNativeButton]}
               onPress={() => navigation.navigate('VideoAITransNative' as never)}
             >
-              <Text style={styles.buttonText}>AI视频助手（优化版）</Text>
+              <Text style={styles.buttonText}>AI视频助手</Text>
             </TouchableOpacity>
             
             <TouchableOpacity

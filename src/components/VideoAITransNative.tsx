@@ -190,37 +190,19 @@ export const useVideoStore = create<VideoStore>((set) => ({
 }));
 
 // 权限请求组件
-const PermissionRequest: React.FC<{
-  onRequestPermission: () => void;
-  hasPermission?: boolean;
-  onStartRecording?: () => void;
-}> = ({ onRequestPermission, hasPermission, onStartRecording }) => {
+const PermissionRequest: React.FC<{ onRequestPermission: () => void }> = ({
+  onRequestPermission,
+}) => {
   return (
     <View style={styles.permissionContainer}>
       <View style={styles.permissionContainer}>
-        <Text style={styles.permissionTitle}>
-          {hasPermission ? "准备就绪" : "需要访问权限"}
-        </Text>
+        <Text style={styles.permissionTitle}>需要访问权限</Text>
         <Text style={styles.permissionText}>
-          {hasPermission
-            ? "摄像头和麦克风权限已获取，点击下方按钮开始录制"
-            : "为了更好的体验，我们需要访问您的摄像头和麦克风权限"}
+          为了更好的体验，我们需要访问您的摄像头和麦克风权限
         </Text>
-        {hasPermission ? (
-          <TouchableOpacity
-            style={[styles.callButton]}
-            onPress={onStartRecording}
-          >
-            <Text style={{ fontSize: 20, color: "#FFF" }}>开始录制</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={onRequestPermission}
-          >
-            <Text style={styles.buttonText}>授权访问</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity style={styles.permissionButton} onPress={onRequestPermission}>
+          <Text style={styles.buttonText}>授权访问</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -249,34 +231,34 @@ const VideoView: React.FC<{
     }
   }, [hasPermission]);
 
-  if (!hasPermission) {
-    return (
-      <View style={styles.videoContainer}>
-        <Text style={styles.loadingText}>没有摄像头权限</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.videoContainer}>
+    <View style={styles.cameraContainer}>
       {cameraLoading && (
         <View style={styles.cameraLoading}>
           <ActivityIndicator size="large" color="#333" />
           <Text style={styles.loadingText}>相机启动中...</Text>
         </View>
       )}
-      <View style={styles.cameraContainer}>
-        <CameraView
-          ref={cameraRef}
-          style={{ width: "100%", height: "100%" }}
-          facing="back"
-          onCameraReady={() => {
-            console.log("相机已就绪");
-            setCameraReady(true);
-            setCameraLoading(false);
-            handleCameraReady();
-          }}
-        />
+      <View style={styles.camera}>
+        {hasPermission ? (
+          <CameraView
+            ref={cameraRef}
+            style={{ width: "100%", height: "100%" }}
+            facing="back"
+            onCameraReady={() => {
+              console.log("相机已就绪");
+              setCameraReady(true);
+              setCameraLoading(false);
+              handleCameraReady();
+            }}
+          />
+        ) : (
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#000"}}>
+            <Text style={{color: '#FFF', fontSize: 16, textAlign: 'center', padding: 10}}>
+              需要摄像头权限才能预览
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -501,17 +483,13 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
   const handleStartCall = async () => {
     // 检查权限
     if (!cameraPermission?.granted) {
-      // 请求权限
-      const hasAllPermissions = await requestPermissions();
-      if (!hasAllPermissions) {
-        useVideoStore.getState().setVideoState(VideoState.PermissionRequired);
-        return;
-      }
+     // 没权限就返回报错 TODO
+     return;
     }
-
+    
     // 更新状态为录制中
     useVideoStore.getState().setVideoState(VideoState.Capturing);
-
+    
     // 启动猫叫检测模块
     if (meowDetectorModuleRef.current) {
       meowDetectorModuleRef.current.startListening();
@@ -538,98 +516,14 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
     }
   };
 
-  // 根据权限和通话状态渲染不同内容
-  const renderContent = () => {
-    // 需要请求权限
-    if (
-      videoState === VideoState.PermissionRequired ||
-      !cameraPermission?.granted
-    ) {
-      return (
-        <PermissionRequest
-          onRequestPermission={requestPermissions}
-          hasPermission={cameraPermission?.granted}
-          onStartRecording={handleStartCall}
-        />
-      );
-    }
-
-    // 已连接状态显示视频界面
-    if (videoState === VideoState.Capturing) {
-      return (
-        <View style={styles.contentContainer}>
-          <View style={styles.cameraSection}>
-            <View style={styles.cameraArea}>
-              <VideoView
-                cameraRef={cameraRef}
-                hasPermission={cameraPermission?.granted}
-              />
-            </View>
-
-            {/* AI分析状态区域 */}
-            <View style={styles.aiStatusSection}>
-              {aiState === AIAnalysisState.Analyzing && (
-                <View style={styles.aiAnalyzing}>
-                  <ActivityIndicator size="small" color="#FF6B95" />
-                  <Text style={styles.aiStatusText}>小猫咪在说什么呢...</Text>
-                </View>
-              )}
-
-              {isWaitingResponse && (
-                <ActivityIndicator size="small" color="#FF6B95" />
-              )}
-            </View>
-          </View>
-
-          <View style={styles.resultSection}>
-            <Text style={styles.sectionTitle}>分析结果</Text>
-            <ScrollView style={styles.analysisScroll}>
-              {analysisHistory.length === 0 ? (
-                <Text style={styles.noResultText}>等待检测到猫叫声...</Text>
-              ) : (
-                analysisHistory.map((item, index) => (
-                  <View key={index} style={styles.analysisItem}>
-                    <View style={styles.analysisHeader}>
-                      <Text style={styles.analysisTime}>
-                        {new Date(item.timestamp).toLocaleTimeString()}
-                      </Text>
-                    </View>
-                    {item.frameDataUrl && (
-                      <Image
-                        source={{ uri: item.frameDataUrl }}
-                        style={styles.analysisImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                    {item.is_meow ? (
-                      <Text style={styles.analysisText}>
-                        {item.most_likely_meaning || "无法识别猫咪想表达的意思"}
-                      </Text>
-                    ) : (
-                      <Text style={styles.analysisText}>未检测到猫叫声</Text>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      );
-    }
-
-    // 其他状态显示连接界面
-    return <View />;
-  };
 
   // 启动相机处理函数
   const handleStartCamera = async () => {
     console.log('请求授权摄像头和录音权限...');
-    // 直接使用requestPermissions函数请求所需权限
-    const hasPermissions = await requestPermissions();
     
-    // 如果有权限并且相机未启动，则启动相机
-    if (hasPermissions && !cameraStarted) {
-      console.log('权限获取成功，正在启动相机...');
+    // 如果已经有权限，直接启动相机
+    if (cameraPermission?.granted && !cameraStarted) {
+      console.log('权限已获取，正在启动相机...');
       setCameraLoading(true);
       setCameraStarted(true);
       
@@ -641,95 +535,62 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           setCameraLoading(false);
         }
       }, 5000); // 5秒超时
+    } else if (!cameraPermission?.granted) {
+      // 没有权限，先请求权限
+      console.log('没有权限，请求授权...');
+      const hasAllPermissions = await requestPermissions();
       
-    } else if (!hasPermissions) {
-      console.log('权限获取失败');
+      // 如果获得了权限，自动启动相机
+      if (hasAllPermissions && !cameraStarted) {
+        console.log('权限获取成功，正在启动相机...');
+        setCameraLoading(true);
+        setCameraStarted(true);
+        
+        // 超时处理
+        setTimeout(() => {
+          if (cameraLoading) {
+            console.log('相机启动超时，自动结束启动');
+            setCameraReady(true);
+            setCameraLoading(false);
+          }
+        }, 5000);
+      } else {
+        console.log('权限获取失败');
+      }
     }
   };
-
-  // 相机准备完成回调
-  const handleCameraReady = () => {
-    console.log('相机已就绪及调用到了handleCameraReady');
-    setCameraReady(true);
-    setCameraLoading(false);
-    // 注意：此处不再自动开始录制
-  };
-
   // 渲染相机内容的函数
   const renderCameraContent = () => {
     // 相机未启动，显示占位符
     if (!cameraStarted) {
-      if (cameraPermission?.granted && microphonePermission?.granted) {
-        // 有权限时显示占位符
-        return (
-          <TouchableOpacity
-            style={styles.cameraPlaceholder}
-            onPress={handleStartCamera}
-          >
-            <View style={styles.cameraIconContainer}>
-              <Text style={styles.cameraIcon}>📷</Text>
+      // 不管有没有权限，都显示相机区域（无权限时用黑色遮盖）
+      return (
+        <TouchableOpacity
+          style={styles.cameraPlaceholder}
+          onPress={handleStartCamera}
+        >
+          <View style={styles.cameraIconContainer}>
+            <Text style={styles.cameraIcon}>📷</Text>
+            {cameraPermission?.granted && microphonePermission?.granted ? (
               <Text style={styles.cameraPlaceholderText}>点击开启摄像和录音</Text>
-            </View>
-          </TouchableOpacity>
-        );
-      } else {
-        // 无权限时显示提示
-        return (
-          <TouchableOpacity
-            style={styles.cameraPlaceholder}
-            onPress={handleStartCamera}
-          >
-            <View style={styles.cameraIconContainer}>
-              <Text style={styles.cameraIcon}>📷</Text>
-              <Text style={styles.cameraPlaceholderText}>需要摄像和录音权限</Text>
-              <Text style={styles.loadingText}>点击请求权限</Text>
-            </View>
-          </TouchableOpacity>
-        );
-      }
+            ) : (
+              <>
+                <Text style={styles.cameraPlaceholderText}>需要摄像和录音权限</Text>
+                <Text style={styles.loadingText}>点击请求权限</Text>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
     }
 
-    // 相机已启动，始终显示相机画面
+    // 相机已启动，使用 VideoView 组件渲染相机
     return (
       <View style={{ flex: 1 }}>
-        <CameraView
-          ref={cameraRef}
-          style={{ width: "100%", height: "100%" }}
-          facing="back"
-          onCameraReady={handleCameraReady}
+        <VideoView
+          cameraRef={cameraRef}
+          hasPermission={cameraPermission?.granted || false}
         />
-        
-        {/* 加载中显示半透明提示层 */}
-        {cameraLoading && (
-          <View style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: 'rgba(0,0,0,0.5)'
-          }}>
-            <ActivityIndicator size="large" color="#FFF" />
-            <Text style={{ color: '#FFF', marginTop: 10 }}>相机启动中...</Text>
-            <TouchableOpacity 
-              style={{
-                marginTop: 20,
-                backgroundColor: '#007AFF',
-                padding: 10,
-                borderRadius: 5
-              }}
-              onPress={() => {
-                console.log('强制完成相机启动');
-                setCameraLoading(false);
-                setCameraReady(true);
-              }}
-            >
-              <Text style={{color: '#FFF'}}>立即开始使用</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     );
   };
@@ -823,16 +684,9 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
             console.error("背景图片加载错误:", e.nativeEvent.error)
           }
         >
-          {/* <View style={styles.header}>
-          <TouchableOpacity onPress={onExit || goToHomePage} style={styles.backButton}>
-            <Text style={styles.backButtonText}>返回</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>电子猫子</Text>
-          <View style={styles.spacer} />
-        </View>
-         */}
           <View style={styles.videoContainer}>{renderCameraContent()}</View>
           
+          <>TODO 展示猫叫的分析结果</>
           {/* 情感选择面板触发按钮，始终显示在右下角 */}
           <TouchableOpacity
             style={styles.emotionPanelButton}
@@ -840,20 +694,6 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           >
             <Text style={styles.emotionPanelButtonText}>😺</Text>
           </TouchableOpacity>
-          
-          {/* 仅在相机启动后显示录制控制按钮 */}
-          {cameraStarted && cameraReady && (
-            <View style={styles.controlsContainer}>
-              <TouchableOpacity 
-                style={[styles.callButton, videoState === VideoState.Capturing ? styles.endCallButton : {}]} 
-                onPress={videoState === VideoState.Capturing ? handleEndCall : handleStartCall}
-              >
-                <Text style={{fontSize: 16, color: '#FFF'}}>
-                  {videoState === VideoState.Capturing ? '结束录制' : '开始录制'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
           
           {/* 情感选择滑动面板 */}
           {isPanelVisible && (
@@ -1001,21 +841,27 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   videoContainer: {
-    width: windowWidth * 0.5,
-    height: windowWidth * 0.5,
+    width: windowWidth * 0.85,
+    height: windowWidth * 0.85,
     borderRadius: windowWidth * 0.25,
     overflow: "hidden",
     backgroundColor: "#333",
     alignSelf: "center",
-    marginVertical: 20,
     justifyContent: "center",
     alignItems: "center",
+    top: windowHeight * 0.04,
+    borderWidth: 3,
+    borderColor: "#FF6B95",
   },
   cameraContainer: {
-    width: "100%",
-    height: "100%",
+    width: windowWidth * 0.85,
+    height: windowWidth * 0.85,
     borderRadius: windowWidth * 0.25,
     overflow: "hidden",
+    backgroundColor: "#333",
+    alignSelf: "center",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 3,
     borderColor: "#FF6B95",
   },
