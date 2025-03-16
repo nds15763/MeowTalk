@@ -61,7 +61,12 @@ export class MoonShotService {
 
       const currentTime = new Date().getTime();
       if (currentTime - this.lastCallTime < this.minCallInterval) {
-        throw new Error(`请至少等待${this.minCallInterval}毫秒后再次调用`);
+        return {
+          text: `请至少等待${this.minCallInterval}毫秒后再次调用`,
+          is_meow: false,
+          emotions: [],
+          most_likely_meaning: ""
+        };
       }
       this.lastCallTime = currentTime;
 

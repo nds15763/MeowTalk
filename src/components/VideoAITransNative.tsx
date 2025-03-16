@@ -71,36 +71,6 @@ export interface MeowAIModelResponse {
   most_likely_meaning?: string; // 最可能的意思
 }
 
-// 抽象的大模型调用服务
-class MeowAIService {
-  async analyzeImageWithContext(
-    imageBase64: string,
-    audioFeatures: AudioFeatures
-  ): Promise<MeowAIModelResponse> {
-    // 这里是大模型调用的抽象实现，未来会被真实实现替换
-    console.log(
-      "调用大模型分析图像和音频特征，图像大小:",
-      imageBase64.length,
-      "音频特征:",
-      JSON.stringify(audioFeatures)
-    );
-
-    // 模拟大模型分析结果
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          text: `分析结果: 这只猫咪可能在表达${Math.random() < 0.5 ? "饥饿" : "想要关注"}。它的音频特征显示声音频率为${audioFeatures.FundamentalFreq.toFixed(1)}Hz，持续时间为${audioFeatures.Duration.toFixed(2)}秒。`,
-          is_meow: true,
-          emotions: [
-            { emotion: "happy", confidence: 0.8 },
-            { emotion: "sad", confidence: 0.2 },
-          ],
-          most_likely_meaning: "猫咪想要吃东西",
-        });
-      }, 1000);
-    });
-  }
-}
 
 // 创建视频状态存储
 interface VideoStore {
@@ -156,9 +126,17 @@ export const useVideoStore = create<VideoStore>((set) => ({
   ...initialState,
   // 添加分析结果
   addAnalysisResult: (result: VideoContext) => {
-    set((state) => ({
-      analysisHistory: [...state.analysisHistory, result],
-    }));
+    set((state) => {
+      // 添加新的结果
+      const newHistory = [...state.analysisHistory, result];
+      
+      // 按照时间戳降序排列（最新的结果在最上面）
+      newHistory.sort((a, b) => b.timestamp - a.timestamp);
+      
+      return {
+        analysisHistory: newHistory,
+      };
+    });
   },
   // 设置当前分析结果
   setCurrentAnalysis: (analysis: string) => {
@@ -212,7 +190,8 @@ const PermissionRequest: React.FC<{ onRequestPermission: () => void }> = ({
 const VideoView: React.FC<{
   cameraRef: React.RefObject<CameraView>;
   hasPermission: boolean;
-}> = ({ cameraRef, hasPermission }) => {
+  onReady?: () => void; // 添加相机就绪回调
+}> = ({ cameraRef, hasPermission, onReady }) => {
   const [cameraLoading, setCameraLoading] = useState<boolean>(false);
   const [cameraReady, setCameraReady] = useState<boolean>(false);
 
@@ -220,7 +199,11 @@ const VideoView: React.FC<{
     console.log("摄像头已就绪");
     setCameraReady(true);
     setCameraLoading(false);
-  }, []);
+    // 调用onReady回调通知父组件
+    if (onReady) {
+      onReady();
+    }
+  }, [onReady]);
 
   // 监听权限变化
   useEffect(() => {
@@ -245,12 +228,7 @@ const VideoView: React.FC<{
             ref={cameraRef}
             style={{ width: "100%", height: "100%" }}
             facing="back"
-            onCameraReady={() => {
-              console.log("相机已就绪");
-              setCameraReady(true);
-              setCameraLoading(false);
-              handleCameraReady();
-            }}
+            onCameraReady={handleCameraReady}
           />
         ) : (
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: "#000"}}>
@@ -332,6 +310,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
         console.log("猫叫检测模块状态改变:", state);
       },
       onMeowDetected: (result) => {
+        console.log("猫叫检测回调触发，结果:", JSON.stringify(result));
         if (result.isMeow && result.features) {
           console.log(
             "检测到猫叫，特征数据:",
@@ -342,7 +321,10 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           setMeowFeatures(result.features);
 
           // 在检测到猫叫时立即捕获一张图片
+          console.log("准备捕获图片进行分析...");
           captureImage(result.features);
+        } else {
+          console.log("未检测到猫叫或特征数据不完整");
         }
       },
       onError: (error) => {
@@ -375,6 +357,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
 
   // 捕获图像并与音频特征一起发送到AI分析
   const captureImage = async (audioFeatures: AudioFeatures) => {
+    console.log("开始捕获图像并发送到AI分析，音频特征:", JSON.stringify(audioFeatures));
     if (!cameraRef.current) {
       console.error("相机未就绪");
       return;
@@ -382,6 +365,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
 
     try {
       useVideoStore.getState().setIsProcessingFrame(true);
+      console.log("开始捕获图像...");
 
       // 捕获图像
       const photo = await cameraRef.current.takePictureAsync({
@@ -404,6 +388,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
         if (photo.base64 && meowAIServiceRef.current) {
           setAIState(AIAnalysisState.Analyzing);
           setIsWaitingResponse(true);
+          console.log("开始发送图像到AI服务进行分析...");
 
           try {
             // 调用AI服务分析图像和音频特征
@@ -413,24 +398,34 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
                 audioFeatures
               );
 
+            console.log("AI分析完成，返回结果:", JSON.stringify(response));
+            
             // 处理返回结果
             if (response && response.text) {
               // 添加分析结果
-              addAnalysisResult({
+              const analysisResult = {
                 message: response.text,
                 timestamp: Date.now(),
                 frameDataUrl: `data:image/jpeg;base64,${photo.base64}`,
                 is_meow: response.is_meow,
                 most_likely_meaning: response.most_likely_meaning,
-              });
+              };
+              console.log("添加分析结果到历史记录:", JSON.stringify(analysisResult));
+              
+              // 只有当检测到猫叫时才添加到历史记录
+              if (response.is_meow) {
+                addAnalysisResult(analysisResult);
+              } else {
+                console.log("未检测到猫叫，不添加到历史记录");
+              }
+            } else {
+              console.warn("AI服务返回结果不完整:", response);
             }
-
-            setIsWaitingResponse(false);
-            setAIState(AIAnalysisState.Done);
           } catch (error: any) {
             console.error("AI分析调用失败:", error);
+          } finally {
             setIsWaitingResponse(false);
-            setAIState(AIAnalysisState.Idle);
+            setAIState(AIAnalysisState.Done);
           }
         }
       }
@@ -533,6 +528,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           console.log('相机启动超时，自动结束启动');
           setCameraReady(true);
           setCameraLoading(false);
+          // 相机就绪事件会在VideoView组件中处理启动猫叫检测
         }
       }, 5000); // 5秒超时
     } else if (!cameraPermission?.granted) {
@@ -552,6 +548,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
             console.log('相机启动超时，自动结束启动');
             setCameraReady(true);
             setCameraLoading(false);
+            // 相机就绪事件会在VideoView组件中处理启动猫叫检测
           }
         }, 5000);
       } else {
@@ -590,6 +587,16 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
         <VideoView
           cameraRef={cameraRef}
           hasPermission={cameraPermission?.granted || false}
+          onReady={() => {
+            console.log("相机已就绪，准备启动猫叫检测");
+            setCameraReady(true);
+            
+            // 启动猫叫检测
+            if (meowDetectorModuleRef.current) {
+              console.log('启动猫叫声检测...');
+              meowDetectorModuleRef.current.startListening();
+            }
+          }}
         />
       </View>
     );
@@ -673,6 +680,16 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
     outputRange: [0, windowHeight * 0.6], // 面板高度为屏幕的60%
   });
 
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (analysisHistory.length > 0 && scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      }, 100);
+    }
+  }, [analysisHistory.length]);
+
   return (
     <View style={styles.rootContainer}>
       <SafeAreaView style={styles.container}>
@@ -686,7 +703,57 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
         >
           <View style={styles.videoContainer}>{renderCameraContent()}</View>
           
-          <>TODO 展示猫叫的分析结果</>
+          {/* 分析结果显示 */}
+          {/* {analysisHistory.length > 0 ? (
+            <View style={styles.resultContainer}>
+              <Text style={styles.resultTitle}>分析结果</Text>
+              <Text style={styles.resultText}>
+                {analysisHistory[analysisHistory.length - 1].most_likely_meaning || '正在分析猫叫的意义...'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.noResultContainer}>
+              <Text style={styles.noResultText}>等待猫叫...</Text>
+            </View>
+          )} */}
+          
+          {/* 聊天对话框 */}
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.chatBubbleContainer}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={true}
+          >
+            {analysisHistory.length > 0 ? (
+              [...analysisHistory].map((result, index) => {
+                // 根据索引决定背景色，最新的应该是索引0
+                let backgroundColor = 'white';
+                if (index === 0) {
+                  backgroundColor = '#A864af'; // 最新的一条使用指定颜色
+                } else if (index === 1) {
+                  backgroundColor = '#C08BC7'; // 第二条消息颜色淡一些
+                } else if (index === 2) {
+                  backgroundColor = '#D7B2DF'; // 第三条消息颜色更淡
+                }
+                
+                return (
+                  <View key={index} style={[styles.chatBubble, { backgroundColor }]}>
+                    <Text style={styles.bubbleTitle}>
+                      分析结果{index === 1 ? ' Latest' : ''}
+                    </Text>
+                    <Text style={styles.bubbleText}>
+                      {result.most_likely_meaning || '正在分析猫叫的意义...'}
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={styles.noChatContainer}>
+                <Text style={styles.noChatText}>等待猫叫...</Text>
+              </View>
+            )}
+          </ScrollView>
+          
           {/* 情感选择面板触发按钮，始终显示在右下角 */}
           <TouchableOpacity
             style={styles.emotionPanelButton}
@@ -774,21 +841,37 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
 const windowWidth = Dimensions.get("window").width;
 const windowHeight = Dimensions.get("window").height;
 
+// 共享样式
+const baseResultContainerStyle = {
+  position: "absolute" as "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  padding: 15,
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: -3 },
+  shadowOpacity: 0.1,
+  shadowRadius: 5,
+  elevation: 5,
+};
+
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
-    backgroundColor: "#ef7c8e", // 添加背景色
+    backgroundColor: "#ef7c8e", // 背景色
   },
   backgroundImage: {
     flex: 1,
     width: "100%",
-    height: "100%", // 添加高度确保图片填充整个区域
+    height: "100%", // 背景图片大小
   },
   backgroundImageStyle: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover", // 尝试使用contain而不是cover
-    opacity: 0.5, // 添加透明度以便更容易看到
+    resizeMode: "cover", // 背景图片缩放模式
+    opacity: 0.5, // 背景图片透明度
   },
   container: {
     flex: 1,
@@ -1095,10 +1178,53 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
-    zIndex: 0, // 确保背景图片在其他元素下面
-    opacity: 0.8, // 调整背景图片透明度
+    zIndex: 0, // 背景图片在其他元素的下面
+    opacity: 0.8, // 背景图片透明度
   },
-  /* 情感面板按钮样式 */
+  /* 聊天对话框样式 */
+  chatBubbleContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 20,
+    right: 20,
+    maxHeight: windowHeight * 0.5,
+    overflow: 'scroll',
+  },
+  chatBubble: {
+    maxWidth: '70%',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 10,
+    elevation: 3,  // Android阴影
+    shadowColor: '#000',  // iOS阴影
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  bubbleTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  bubbleText: {
+    fontSize: 16,
+    color: '#333',
+    flexWrap: 'wrap',
+  },
+  noChatContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    marginTop: 10,
+  },
+  noChatText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  /* 情感选择面板触发按钮样式 */
   emotionPanelButton: {
     position: "absolute",
     bottom: 30,
@@ -1119,7 +1245,7 @@ const styles = StyleSheet.create({
   emotionPanelButtonText: {
     fontSize: 24,
   },
-  /* 情感选择面板样式 */
+  /* 情感选择滑动面板样式 */
   emotionPanel: {
     position: "absolute",
     bottom: 0,
@@ -1177,7 +1303,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   emotionButton: {
-    width: (windowWidth - 32 - 16) / 3, // 屏幕宽度减去左右padding和间距
+    width: (windowWidth - 32 - 16) / 3, // 每个情感按钮的宽度
     aspectRatio: 1,
     backgroundColor: "#FFE8E8",
     borderRadius: 12,
@@ -1261,6 +1387,31 @@ const styles = StyleSheet.create({
   playButtonText: {
     fontSize: 14,
     color: "#FFF",
+  },
+  baseResultContainer: baseResultContainerStyle,
+  resultContainer: {
+    ...baseResultContainerStyle,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+  },
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 10,
+  },
+  resultText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  noResultContainer: {
+    ...baseResultContainerStyle,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+  },
+  debugInfo: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    marginBottom: 5,
   },
 });
 

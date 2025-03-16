@@ -260,10 +260,10 @@ export class MeowDetectorModule {
       console.log("条件满足: 至少2秒数据");
     }
 
-    // 条件2: 自上次处理已经过去了至少2秒（强制处理）
+    // 条件2: 自上次处理已经过去了至少5秒（强制处理）
     const timeSinceLastProcess =
       (Date.now() - this.processor.getLastProcessTime()) / 1000;
-    if (timeSinceLastProcess >= 2.0 && durationSeconds >= 1.0) {
+    if (timeSinceLastProcess >= 5.0 && durationSeconds >= 1.0) {
       shouldProcess = true;
       console.log(
         `条件满足: 距离上次处理已过去${timeSinceLastProcess.toFixed(1)}秒`
