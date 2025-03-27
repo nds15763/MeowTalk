@@ -80,7 +80,7 @@ export class MoonShotService {
 
       // 使用OpenAI SDK调用MoonShot API
       const completion = await this.client.chat.completions.create({
-        model: "moonshot-v1-128k-vision-preview", // 使用视觉模型
+        model: "moonshot-v1-8k-vision-preview", // 使用视觉模型
         messages: [
           {
             "role": "system", 

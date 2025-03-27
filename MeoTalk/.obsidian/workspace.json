@@ -128,7 +128,7 @@
               "type": "tag",
               "state": {
                 "sortOrder": "frequency",
-                "useHierarchy": true,
+                "useHierarchy": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
@@ -171,8 +171,9 @@
   "active": "edb0c0f9d19bc974",
   "lastOpenFiles": [
     "猫叫检测功能设计.md",
-    "V1.0版本Todo.md",
     "MeowTalker设计文档.md",
+    "V1.0版本Todo.md",
+    "金额分成逻辑表.md",
     "u732bu53ebu68c0u6d4bu529fu80fdu8bbeu8ba1.md",
     "MeowTalk调用链分析.md",
     "MeowTalkeru8bbeu8ba1u6587u6863.md",

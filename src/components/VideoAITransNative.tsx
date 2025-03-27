@@ -29,6 +29,8 @@ import { MoonShotService } from "../sdk/MoonShot";
 import { MeowDetectorModule } from "../sdk/MeowDetectorModule";
 import { emotions, emotionCategories } from "../config/emotions";
 import { Emotion, EmotionCategory } from "../types/emotion";
+// 导入图片压缩工具
+import { compressImage, imageToBase64 } from "../utils/imageProcessor";
 
 // 定义视频状态枚举
 export enum VideoState {
@@ -70,7 +72,6 @@ export interface MeowAIModelResponse {
   emotions?: MeowEmotion[]; // 表情列表
   most_likely_meaning?: string; // 最可能的意思
 }
-
 
 // 创建视频状态存储
 interface VideoStore {
@@ -322,7 +323,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
 
           // 在检测到猫叫时立即捕获一张图片
           console.log("准备捕获图片进行分析...");
-          captureImage(result.features);
+          captureFrame(result.features);
         } else {
           console.log("未检测到猫叫或特征数据不完整");
         }
@@ -340,26 +341,10 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
     };
   }, []);
 
-  // 处理猫叫检测结果的回调函数
-  const handleMeowDetected = useCallback(
-    async (isMeow: boolean, features?: AudioFeatures, confidence?: number) => {
-      console.log("未检测到猫叫声");
-      if (isMeow && features) {
-        console.log("检测到猫叫声，特征数据:", features, "可信度:", confidence);
-        setMeowFeatures(features);
-
-        // 在检测到猫叫时立即捕获一张图片
-        await captureImage(features);
-      }
-    },
-    []
-  );
-
   // 捕获图像并与音频特征一起发送到AI分析
-  const captureImage = async (audioFeatures: AudioFeatures) => {
-    console.log("开始捕获图像并发送到AI分析，音频特征:", JSON.stringify(audioFeatures));
-    if (!cameraRef.current) {
-      console.error("相机未就绪");
+  const captureFrame = async (audioFeatures: AudioFeatures) => {
+    if (!cameraRef.current || !meowAIServiceRef.current) {
+      console.error("相机或AI服务没有准备好");
       return;
     }
 
@@ -384,8 +369,24 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           photo.base64?.length || 0
         );
 
+        // 压缩图像
+        console.log("开始压缩图像...");
+        const compressedImageUri = await compressImage(photo.uri, 200, 200, 0.6);
+        console.log("图像压缩完成，URI:", compressedImageUri);
+
+        // 转换压缩后的图像为base64
+        const compressedBase64 = await imageToBase64(compressedImageUri);
+        
+        if (!compressedBase64) {
+          console.error("压缩图像转base64失败，将使用原始图像");
+        }
+        
+        // 使用压缩后的base64或原始base64
+        const imageBase64 = compressedBase64 || photo.base64;
+        console.log("处理后图像大小:", imageBase64?.length || 0);
+
         // 如果有base64数据，发送到AI分析
-        if (photo.base64 && meowAIServiceRef.current) {
+        if (imageBase64 && meowAIServiceRef.current) {
           setAIState(AIAnalysisState.Analyzing);
           setIsWaitingResponse(true);
           console.log("开始发送图像到AI服务进行分析...");
@@ -394,7 +395,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
             // 调用AI服务分析图像和音频特征
             const response =
               await meowAIServiceRef.current.analyzeImageWithAudio(
-                photo.base64,
+                imageBase64,
                 audioFeatures
               );
 
@@ -406,7 +407,7 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
               const analysisResult = {
                 message: response.text,
                 timestamp: Date.now(),
-                frameDataUrl: `data:image/jpeg;base64,${photo.base64}`,
+                frameDataUrl: `data:image/jpeg;base64,${imageBase64}`,
                 is_meow: response.is_meow,
                 most_likely_meaning: response.most_likely_meaning,
               };
