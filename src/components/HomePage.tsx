@@ -1,55 +1,144 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Image, ImageBackground, Dimensions, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState } from 'react';
+import {
+  SafeAreaView,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  TextInput,
+  ImageBackground,
+  Linking,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 export default function HomePage() {
   const navigation = useNavigation();
-  const [logoClicks, setLogoClicks] = React.useState(0);
+  const [email, setEmail] = useState('');
+  const [isEmailValid, setIsEmailValid] = useState(true);
+  const [logoClicks, setLogoClicks] = useState(0);
 
   const handleLogoClick = () => {
     setLogoClicks(prev => prev + 1);
   };
 
+  // 验证邮箱格式
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // 处理邮箱输入变化
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    setIsEmailValid(true); // 输入时重置验证状态
+  };
+
+  // 处理注册
+  const handleSignUp = () => {
+    if (!email || !validateEmail(email)) {
+      setIsEmailValid(false);
+      return;
+    }
+    // 后续可以添加更多注册逻辑
+    // 注册成功后跳转到VideoAITransNative页面
+    navigation.navigate('VideoAITransNative' as never);
+  };
+
+  // 处理登录
+  const handleSignIn = () => {
+    if (!email || !validateEmail(email)) {
+      setIsEmailValid(false);
+      return;
+    }
+    // 后续可以添加更多登录逻辑
+    // 登录成功后跳转到VideoAITransNative页面
+    navigation.navigate('VideoAITransNative' as never);
+  };
+
+  // 使用Google登录
+  const handleGoogleSignIn = () => {
+    // 后续可以添加Google登录逻辑
+    // 登录成功后跳转到VideoAITransNative页面
+    navigation.navigate('VideoAITransNative' as never);
+  };
+
+  // 处理Terms of Service链接
+  const handleTermsPress = () => {
+    // 这里可以跳转到服务条款页面或打开网页
+    Linking.openURL('https://www.example.com/terms');
+  };
+
+  // 处理Privacy Policy链接
+  const handlePrivacyPress = () => {
+    // 这里可以跳转到隐私政策页面或打开网页
+    Linking.openURL('https://www.example.com/privacy');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.pageContainer}>
-        <ImageBackground 
-          source={require('../../images/homeback.png')}
-          style={styles.backgroundImage}
-          imageStyle={styles.backgroundImageStyle}
-        >
           <View style={styles.container}>
             <TouchableOpacity onPress={handleLogoClick}>
-              <Image
+            <Image
                 source={logoClicks >= 5 ? require('../../images/cat_logo_2.png') : require('../../images/cat_logo.png')}
-                style={styles.logo}
+              style={styles.logo}
+            />
+            </TouchableOpacity>
+            <Text style={styles.title}>Sign up on MeowTalker</Text>
+            <Text style={styles.subtitle}>Translate your cats meows into emotions!</Text>
+            
+            {/* 邮箱输入框 */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, !isEmailValid && styles.inputError]}
+                placeholder="Email"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={handleEmailChange}
               />
-            </TouchableOpacity>
-            <Text style={styles.title}>Welcome to MeowTalk</Text>
-            <Text style={styles.subtitle}>Translate your cat's meows into emotions!</Text>
+              {!isEmailValid && (
+                <Text style={styles.errorText}>请输入有效的邮箱地址</Text>
+              )}
+            </View>
+            
+            {/* 登录注册按钮 */}
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.signInButton]}
+                onPress={handleSignIn}
+              >
+                <Text style={styles.buttonText}>登录</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.button, styles.signUpButton]}
+                onPress={handleSignUp}
+              >
+                <Text style={styles.buttonText}>注册</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Google登录按钮 */}
             <TouchableOpacity
-              style={styles.button}
-              onPress={() => navigation.navigate('Translate' as never)}
+              style={[styles.button, styles.googleButton]}
+              onPress={handleGoogleSignIn}
             >
-              <Text style={styles.buttonText}>Translate</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.aiTalkNativeButton]}
-              onPress={() => navigation.navigate('VideoAITransNative' as never)}
-            >
-              <Text style={styles.buttonText}>AI视频助手</Text>
+              <Text style={styles.buttonText}>Sign in with Google</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity
-              style={[styles.button, styles.testButton]}
-              onPress={() => navigation.navigate('TestAudio' as never)}
-            >
-              <Text style={styles.buttonText}>Test Audio</Text>
-            </TouchableOpacity>
+            {/* 底部链接 */}
+            <View style={styles.footerLinks}>
+              <TouchableOpacity onPress={handleTermsPress}>
+                <Text style={styles.linkText}>Terms of Service</Text>
+              </TouchableOpacity>
+              <Text style={styles.linkSeparator}>|</Text>
+              <TouchableOpacity onPress={handlePrivacyPress}>
+                <Text style={styles.linkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </ImageBackground>
       </View>
     </SafeAreaView>
   );
@@ -58,69 +147,105 @@ export default function HomePage() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#EF7C8E',
-    alignItems: 'center',
-    overflow: 'hidden',
   },
   pageContainer: {
     flex: 1,
-    alignItems: 'center',
-    width: '100%',
-    overflow: 'hidden',
   },
   backgroundImage: {
-    height: Dimensions.get('window').height,
-    width: Dimensions.get('window').height * (1350/2400),
+    flex: 1,
+    justifyContent: 'center',
   },
   backgroundImageStyle: {
-    width: '100%',
-    height: '100%',
+    opacity: 0.9,
   },
   container: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: Platform.OS === 'android' ? 15 : 20,
-    backgroundColor: 'transparent',
+    padding: 20,
   },
   logo: {
-    width: Platform.OS === 'android' ? 180 : 200,
-    height: Platform.OS === 'android' ? 180 : 200,
-    marginBottom: Platform.OS === 'android' ? 40 : 50,
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
+    marginBottom: 20,
   },
   title: {
-    fontSize: Platform.OS === 'android' ? 24 : 27,
-    color: '#fff',
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: Platform.OS === 'android' ? 8 : 10,
-    textAlign: Platform.OS === 'android' ? 'center' : 'left',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: Platform.OS === 'android' ? 16 : 19,
+    fontSize: 16,
     color: '#fff',
+    marginBottom: 30,
     textAlign: 'center',
-    marginBottom: Platform.OS === 'android' ? 25 : 30,
+  },
+  inputContainer: {
+    width: '100%',
+    marginBottom: 15,
+  },
+  input: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    width: '100%',
+  },
+  inputError: {
+    borderColor: 'red',
+    borderWidth: 1,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 5,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 15,
   },
   button: {
-    backgroundColor: '#A864AF',
-    paddingHorizontal: Platform.OS === 'android' ? 35 : 40,
-    paddingVertical: Platform.OS === 'android' ? 12 : 15,
-    borderRadius: 25,
-    marginVertical: 5,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  testButton: {
-    backgroundColor: '#7B6CF6',  // 使用不同的颜色区分测试按钮
+  signInButton: {
+    backgroundColor: '#3498db',
+    flex: 1,
+    marginRight: 5,
   },
-  aiTalkButton: {
-    backgroundColor: '#FF9A8B',  // 使用暖色调为AI语音助手按钮
+  signUpButton: {
+    backgroundColor: '#2ecc71',
+    flex: 1,
+    marginLeft: 5,
   },
-  aiTalkNativeButton: {
-    backgroundColor: '#34C759',  // 使用绿色调为AI视频助手（优化版）按钮
+  googleButton: {
+    backgroundColor: '#fff',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   buttonText: {
     color: '#fff',
-    fontSize: Platform.OS === 'android' ? 16 : 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    textAlign: Platform.OS === 'android' ? 'center' : 'left',
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    marginTop: 30,
+  },
+  linkText: {
+    color: '#fff',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  linkSeparator: {
+    color: '#fff',
+    marginHorizontal: 10,
   },
 });
