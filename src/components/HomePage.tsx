@@ -30,23 +30,9 @@ export default function HomePage() {
             <Text style={styles.subtitle}>Translate your cat's meows into emotions!</Text>
             <TouchableOpacity
               style={styles.button}
-              onPress={() => navigation.navigate('Translate' as never)}
-            >
-              <Text style={styles.buttonText}>Translate</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.aiTalkNativeButton]}
               onPress={() => navigation.navigate('VideoAITransNative' as never)}
             >
-              <Text style={styles.buttonText}>AI视频助手</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.button, styles.testButton]}
-              onPress={() => navigation.navigate('TestAudio' as never)}
-            >
-              <Text style={styles.buttonText}>Test Audio</Text>
+              <Text style={styles.buttonText}>Translate</Text>
             </TouchableOpacity>
           </View>
         </ImageBackground>
