@@ -369,20 +369,20 @@ const VideoAITransNative: React.FC<VideoProps> = ({ onExit, navigation }) => {
           photo.base64?.length || 0
         );
 
-        // 压缩图像
-        console.log("开始压缩图像...");
-        const compressedImageUri = await compressImage(photo.uri, 200, 200, 0.6);
-        console.log("图像压缩完成，URI:", compressedImageUri);
+        // // 压缩图像
+        // console.log("开始压缩图像...");
+        // const compressedImageUri = await compressImage(photo.uri, 200, 200, 0.6);
+        // console.log("图像压缩完成，URI:", compressedImageUri);
 
-        // 转换压缩后的图像为base64
-        const compressedBase64 = await imageToBase64(compressedImageUri);
+        // // 转换压缩后的图像为base64
+        // const compressedBase64 = await imageToBase64(compressedImageUri);
         
-        if (!compressedBase64) {
-          console.error("压缩图像转base64失败，将使用原始图像");
-        }
+        // if (!compressedBase64) {
+        //   console.error("压缩图像转base64失败，将使用原始图像");
+        // }
         
         // 使用压缩后的base64或原始base64
-        const imageBase64 = compressedBase64 || photo.base64;
+        const imageBase64 =  photo.base64;
         console.log("处理后图像大小:", imageBase64?.length || 0);
 
         // 如果有base64数据，发送到AI分析
